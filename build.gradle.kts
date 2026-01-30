@@ -34,9 +34,12 @@ subprojects {
     apply(plugin = "kotlin-android")
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
-    cloudstream {
-        // Verifica che questi dati siano corretti per il tuo repository
+cloudstream {
         setRepo("elia1986", "SXXX", "github")
+        name = "Chatrubate"
+        description = "Plugin per Chatrubate"
+        authors = listOf("Elia1986")
+        version = 1
     }
 
     android {
