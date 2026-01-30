@@ -8,10 +8,10 @@ buildscript {
         maven("https://jitpack.io")
     }
     dependencies {
-        // Versioni stabili per evitare conflitti con Gradle 9
         classpath("com.android.tools.build:gradle:8.2.2")
         classpath("com.github.recloudstream:gradle:-SNAPSHOT")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20")
+        // AGGIORNATO: Passiamo a Kotlin 2.0.0
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.0")
     }
 }
 
@@ -23,7 +23,6 @@ allprojects {
     }
 }
 
-// Queste funzioni servono a Gradle per riconoscere i blocchi 'cloudstream' e 'android'
 fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) = 
     (extensions.getByName("cloudstream") as CloudstreamExtension).configuration()
 
@@ -36,6 +35,7 @@ subprojects {
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
     cloudstream {
+        // Assicurati che questi dati siano corretti
         setRepo("elia1986", "SXXX", "github")
     }
 
@@ -50,6 +50,11 @@ subprojects {
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_17
             targetCompatibility = JavaVersion.VERSION_17
+        }
+        
+        // AGGIUNTO: Necessario per Kotlin 2.0+
+        kotlinOptions {
+            jvmTarget = "17"
         }
     }
 
