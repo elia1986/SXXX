@@ -1,5 +1,6 @@
 import com.lagradost.cloudstream3.gradle.CloudstreamExtension
 import com.android.build.gradle.BaseExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 buildscript {
     repositories {
@@ -10,7 +11,6 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.2.2")
         classpath("com.github.recloudstream:gradle:-SNAPSHOT")
-        // AGGIORNATO: Passiamo a Kotlin 2.0.0
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.0")
     }
 }
@@ -35,7 +35,7 @@ subprojects {
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
     cloudstream {
-        // Assicurati che questi dati siano corretti
+        // Verifica che questi dati siano corretti per il tuo repository
         setRepo("elia1986", "SXXX", "github")
     }
 
@@ -51,10 +51,14 @@ subprojects {
             sourceCompatibility = JavaVersion.VERSION_17
             targetCompatibility = JavaVersion.VERSION_17
         }
-        
-        // AGGIUNTO: Necessario per Kotlin 2.0+
+    }
+
+    // Configurazione specifica per il compilatore Kotlin
+    tasks.withType<KotlinCompile>().configureEach {
         kotlinOptions {
             jvmTarget = "17"
+            // Ignora i warning sulle versioni metadata per compatibilità con pre-release
+            freeCompilerArgs += "-Xskip-metadata-version-check"
         }
     }
 
@@ -62,6 +66,7 @@ subprojects {
         val implementation by configurations
         val cloudstream by configurations
         
+        // Versione pre-release necessaria per i plugin moderni
         cloudstream("com.lagradost:cloudstream3:pre-release")
         
         implementation("com.github.Blatzar:NiceHttp:0.4.11")
