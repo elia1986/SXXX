@@ -18,14 +18,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Questo passaggio forza l'uso di Gradle 8.10
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10'
 
       - name: Build Plugins
-        run: gradle make --stacktrace
+        run: |
+          # 1. Esegui la compilazione
+          gradle make --stacktrace
+          
+          # 2. Crea la cartella 'builds' che serve alla Action finale
+          mkdir -p builds
+          
+          # 3. Cerca i file .cst e plugins.json generati e copiali in 'builds'
+          # Usiamo 'find' perché Gradle li genera nelle sottocartelle build/
+          find . -name "*.cst" -exec cp {} builds/ \;
+          find . -name "plugins.json" -exec cp {} builds/ \;
+          
+          # 4. Verifica per il log che i file siano lì
+          ls -R builds/
 
       - name: Push to builds branch
         uses: s0/git-publish-subdir-action@develop
