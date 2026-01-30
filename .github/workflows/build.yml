@@ -18,7 +18,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Usiamo il comando 'gradle' direttamente invece di './gradlew'
+      # Questo passaggio forza l'uso di Gradle 8.10
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10'
+
       - name: Build Plugins
         run: gradle make --stacktrace
 
