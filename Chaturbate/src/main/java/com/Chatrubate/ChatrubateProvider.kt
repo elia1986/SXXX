@@ -23,9 +23,9 @@ class ChatrubateProvider : MainAPI() {
         
         val responseList = response?.rooms?.map { room ->
             newLiveSearchResponse(
-                name = room.username,
-                url = "$mainUrl/${room.username}",
-                type = TvType.Live,
+                room.username,
+                "$mainUrl/${room.username}",
+                TvType.Live,
             ).apply {
                 this.posterUrl = room.img
             }
@@ -38,9 +38,9 @@ class ChatrubateProvider : MainAPI() {
         val response = app.get("$mainUrl/api/ts/roomlist/room-list/?hashtags=$query&limit=90").parsedSafe<Response>()
         return response?.rooms?.map { room ->
             newLiveSearchResponse(
-                name = room.username,
-                url = "$mainUrl/${room.username}",
-                type = TvType.Live,
+                room.username,
+                "$mainUrl/${room.username}",
+                TvType.Live,
             ).apply {
                 this.posterUrl = room.img
             }
@@ -50,9 +50,9 @@ class ChatrubateProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val name = url.substringAfterLast("/").replace("/", "")
         return newLiveStreamLoadResponse(
-            name = name,
-            url = url,
-            dataUrl = url,
+            name,
+            url,
+            url,
         ).apply {
             this.posterUrl = "https://roomimage.com/dbimages/previews/${name.lowercase()}.jpg"
         }
@@ -73,9 +73,8 @@ class ChatrubateProvider : MainAPI() {
             ?.replace("\\/", "/")
 
         if (m3u8Url != null) {
-            // Usiamo la versione base senza nomi dei parametri per evitare errori di compilazione
             callback.invoke(
-                ExtractorLink(
+                newExtractorLink(
                     this.name,
                     this.name,
                     m3u8Url,
