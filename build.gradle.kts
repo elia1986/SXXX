@@ -13,7 +13,6 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.7.3")
         classpath("com.github.recloudstream:gradle:-SNAPSHOT")
-        // AGGIORNATO: Portato a 2.1.10 per supportare i nuovi metadati di Cloudstream
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.10") 
     }
 }
@@ -26,8 +25,11 @@ allprojects {
     }
 }
 
-fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) = extensions.getByName<CloudstreamExtension>("cloudstream").configuration()
-fun Project.android(configuration: BaseExtension.() -> Unit) = extensions.getByName<BaseExtension>("android").configuration()
+fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) = 
+    extensions.getByName<CloudstreamExtension>("cloudstream").configuration()
+
+fun Project.android(configuration: BaseExtension.() -> Unit) = 
+    extensions.getByName<BaseExtension>("android").configuration()
 
 subprojects {
     apply(plugin = "com.android.library")
@@ -35,12 +37,13 @@ subprojects {
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
     cloudstream {
+        // Forza l'uso del tuo repository per il file plugins.json
         setRepo(System.getenv("GITHUB_REPOSITORY") ?: "elia1986/SXXX")
     }
 
     android {
-        // AGGIORNATO: Cambia com.example nel tuo namespace se preferisci
-        namespace = "com.lagradost" 
+        // Namespace univoco per evitare conflitti con il vecchio ExampleProvider
+        namespace = "com.Chatrubate" 
 
         defaultConfig {
             minSdk = 21
@@ -60,7 +63,7 @@ subprojects {
                     "-Xno-call-assertions",
                     "-Xno-param-assertions",
                     "-Xno-receiver-assertions",
-                    "-Xskip-metadata-version-check" // AGGIUNTO: Forza il compilatore a ignorare i conflitti di versione Kotlin
+                    "-Xskip-metadata-version-check"
                 )
             }
         }
@@ -70,12 +73,13 @@ subprojects {
         val cloudstream by configurations
         val implementation by configurations
 
+        // Utilizziamo la versione corretta per la compilazione dei plugin
         cloudstream("com.lagradost:cloudstream3:pre-release")
 
         implementation(kotlin("stdlib"))
         implementation("com.github.Blatzar:NiceHttp:0.4.11")
         implementation("org.jsoup:jsoup:1.18.3")
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")
+        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2") // Aggiornato jackson
     }
 }
 
