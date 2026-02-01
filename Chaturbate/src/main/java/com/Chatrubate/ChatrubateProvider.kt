@@ -32,20 +32,16 @@ class ChatrubateProvider : MainAPI() {
 
         val rooms = response?.rooms?.map { room ->
             newLiveSearchResponse(
-                name = room.username,
-                url = "$mainUrl/${room.username}",
-                type = TvType.Live
+                room.username,
+                "$mainUrl/${room.username}",
+                TvType.Live
             ).apply {
                 posterUrl = room.img
             }
         } ?: emptyList()
 
         return newHomePageResponse(
-            HomePageList(
-                request.name,
-                rooms,
-                isHorizontalImages = true
-            ),
+            HomePageList(request.name, rooms, true),
             hasNext = true
         )
     }
@@ -57,9 +53,9 @@ class ChatrubateProvider : MainAPI() {
 
         return response?.rooms?.map { room ->
             newLiveSearchResponse(
-                name = room.username,
-                url = "$mainUrl/${room.username}",
-                type = TvType.Live
+                room.username,
+                "$mainUrl/${room.username}",
+                TvType.Live
             ).apply {
                 posterUrl = room.img
             }
@@ -68,9 +64,9 @@ class ChatrubateProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         return newLiveStreamLoadResponse(
-            name = url.substringAfterLast("/"),
-            url = url,
-            dataUrl = url
+            url.substringAfterLast("/"),
+            url,
+            url
         )
     }
 
@@ -83,18 +79,18 @@ class ChatrubateProvider : MainAPI() {
 
         val html = app.get(data).text
 
-        // Regex robusta che prende qualsiasi stream HLS
+        // Regex robusta per stream HLS
         val regex = Regex("""https://[^"]+\.m3u8""")
         val m3u8Url = regex.find(html)?.value ?: return false
 
         callback.invoke(
             newExtractorLink(
-                source = name,
-                name = "Live",
-                url = m3u8Url,
-                referer = mainUrl,
-                quality = Qualities.Unknown.value,
-                isM3u8 = true
+                this.name,
+                this.name,
+                m3u8Url,
+                mainUrl,
+                Qualities.Unknown.value,
+                true
             )
         )
 
