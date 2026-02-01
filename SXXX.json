@@ -3,6 +3,6 @@
     "description": "CXXX Repository",
     "manifestVersion": 1,
     "pluginLists": [
-      "https://cdn.jsdelivr.net/gh/elia1986/SXXX@builds/plugins.json"
+      "https://raw.githubusercontent.com/elia1986/SXXX/builds/plugins.json"
     ]
   }
