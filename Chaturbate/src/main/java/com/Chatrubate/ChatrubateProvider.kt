@@ -3,6 +3,9 @@ package com.Chatrubate
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
 
 class ChatrubateProvider : MainAPI() {
     override var mainUrl              = "https://chaturbate.com"
@@ -13,6 +16,7 @@ class ChatrubateProvider : MainAPI() {
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
     override val mainPage = mainPageOf(
+        "/api/ts/roomlist/room-list/?limit=90" to "Featured",
         "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
         "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
     )
@@ -78,10 +82,11 @@ class ChatrubateProvider : MainAPI() {
                     this.name,
                     this.name,
                     m3u8Url,
-                    "$mainUrl/",
-                    0, // Qualities.Unknown
-                    true
-                )
+                    ExtractorLinkType.M3U8
+                ) {
+                    this.referer = "$mainUrl/"
+                    this.quality = Qualities.Unknown.value
+                }
             )
         }
         return true
