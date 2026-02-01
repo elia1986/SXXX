@@ -1,0 +1,8 @@
+{
+  "name": "Chatrubate",
+  "className": "ChatrubateProvider",
+  "apiName": "Chatrubate",
+  "providerPath": "com.Chatrubate.ChatrubateProvider",
+  "type": 4,
+  "version": 1
+}
