@@ -21,7 +21,7 @@
     {
         "iconUrl": "https://web.static.mmcdn.com/images/logo.svg?hash=7c993ccd600a",
         "apiVersion": 1,
-        "repositoryUrl": "https://github.com/phisher98/CXXX",
+        "repositoryUrl": "https://github.com/elia1986/SXXX",
         "fileSize": 12025,
         "status": 1,
         "language": "en",
@@ -34,26 +34,7 @@
         "version": 3,
         "internalName": "Chatrubate",
         "description": "Chaturbate - Free Adult Webcams, Live Sex, Free Sex Chat, Exhibitionist & Pornstar Free Cams",
-        "url": "https://raw.githubusercontent.com/phisher98/CXXX/builds/Chatrubate.cs3",
+        "url": "https://raw.githubusercontent.com/elia1986/SXXX/builds/Chaturbate.cs3",
         "name": "Chatrubate"
-    },
-     {
-        "iconUrl": "https://ymaal.co/wp-content/uploads/2025/08/cropped-YMaal.png",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/phisher98/CXXX",
-        "fileSize": 8634,
-        "status": 1,
-        "language": "hi",
-        "authors": [
-            "rockhero1234"
-        ],
-        "tvTypes": [
-            "NSFW"
-        ],
-        "version": 1,
-        "internalName": "YMaal",
-        "description": "adult content",
-        "url": "https://raw.githubusercontent.com/phisher98/CXXX/builds/YMaal.cs3",
-        "name": "YMaal"
     }
 ]
