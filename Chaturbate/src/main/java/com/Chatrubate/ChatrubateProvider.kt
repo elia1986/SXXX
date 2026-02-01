@@ -2,29 +2,29 @@ package com.Chatrubate
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.Qualities
 
 class ChatrubateProvider : MainAPI() {
     override var mainUrl              = "https://chaturbate.com"
     override var name                 = "Chatrubate"
     override val hasMainPage          = true
     override var lang                 = "en"
+    override val hasDownloadSupport   = true
+    override val hasChromecastSupport = true
     override val supportedTypes       = setOf(TvType.NSFW)
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
+    // Homepage modificata: rimosso Featured, partiamo subito con Female e Couples
     override val mainPage = mainPageOf(
-        "/api/ts/roomlist/room-list/?limit=90" to "Featured",
         "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
         "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val offset = if (page <= 1) 0 else 90 * (page - 1)
-        val response = app.get("$mainUrl${request.data}&offset=$offset").parsedSafe<Response>()
+        val offset = if (page == 1) 0 else 90 * (page - 1)
         
+        val response = app.get("$mainUrl${request.data}&offset=$offset").parsedSafe<Response>()
         val responseList = response?.rooms?.map { room ->
             newLiveSearchResponse(
                 room.username,
@@ -34,31 +34,50 @@ class ChatrubateProvider : MainAPI() {
                 this.posterUrl = room.img
             }
         } ?: emptyList()
-        
-        return newHomePageResponse(HomePageList(request.name, responseList, isHorizontalImages = true), hasNext = true)
+
+        return newHomePageResponse(
+            HomePageList(request.name, responseList, isHorizontalImages = true),
+            hasNext = true
+        )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val response = app.get("$mainUrl/api/ts/roomlist/room-list/?hashtags=$query&limit=90").parsedSafe<Response>()
-        return response?.rooms?.map { room ->
-            newLiveSearchResponse(
-                room.username,
-                "$mainUrl/${room.username}",
-                TvType.Live,
-            ).apply {
-                this.posterUrl = room.img
+        val searchResponse = mutableListOf<LiveSearchResponse>()
+        for (i in 0..3) {
+            val response = app.get("$mainUrl/api/ts/roomlist/room-list/?hashtags=$query&limit=90&offset=${i * 90}").parsedSafe<Response>()
+            val results = response?.rooms?.map { room ->
+                newLiveSearchResponse(
+                    room.username,
+                    "$mainUrl/${room.username}",
+                    TvType.Live,
+                ).apply {
+                    this.posterUrl = room.img
+                }
+            } ?: emptyList()
+
+            if (results.isNotEmpty() && !searchResponse.containsAll(results)) {
+                searchResponse.addAll(results)
+            } else {
+                break
             }
-        } ?: emptyList()
+        }
+        return searchResponse
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val name = url.substringAfterLast("/").replace("/", "")
+        val document = app.get(url).document
+        val title = document.selectFirst("meta[property=og:title]")?.attr("content")
+            ?.trim()?.replace("| PornHoarder.tv", "") ?: "Chaturbate Live"
+        val poster = fixUrlNull(document.selectFirst("[property='og:image']")?.attr("content"))
+        val description = document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
+
         return newLiveStreamLoadResponse(
-            name,
+            title,
             url,
             url,
         ).apply {
-            this.posterUrl = "https://roomimage.com/dbimages/previews/${name.lowercase()}.jpg"
+            this.posterUrl = poster
+            this.plot = description
         }
     }
 
@@ -68,26 +87,28 @@ class ChatrubateProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val responseText = app.get(data).text
-        val hlsRegex = """hls_source":\s*"(https:.*?\.m3u8)"""".toRegex()
-        val match = hlsRegex.find(responseText)
+        val doc = app.get(data).document
+        val script = doc.select("script").find { it.html().contains("window.initialRoomDossier") }
         
-        val m3u8Url = match?.groupValues?.get(1)
-            ?.replace("\\u002D", "-")
-            ?.replace("\\/", "/")
+        // Estrazione sicura del link m3u8 dal JSON nel codice sorgente
+        val json = script?.html()?.substringAfter("window.initialRoomDossier = \"")?.substringBefore(";")?.unescapeUnicode()
+        val m3u8Url = "\"hls_source\": \"(.*).m3u8\"".toRegex().find(json ?: "")?.groups?.get(1)?.value
 
         if (m3u8Url != null) {
-            callback.invoke(
-                newExtractorLink(
-                    this.name,
-                    this.name,
-                    m3u8Url,
-                    ExtractorLinkType.M3U8
-                ) {
-                    this.referer = "$mainUrl/"
-                    this.quality = Qualities.Unknown.value
-                }
-            )
+            try {
+                callback.invoke(
+                    newExtractorLink(
+                        this.name,
+                        this.name,
+                        "$m3u8Url.m3u8",
+                        "$mainUrl/",
+                        Qualities.Unknown.value,
+                        true
+                    )
+                )
+            } catch (e: Exception) {
+                logError(e)
+            }
         }
         return true
     }
@@ -95,9 +116,14 @@ class ChatrubateProvider : MainAPI() {
     data class Room(
         @JsonProperty("img") val img: String = "",
         @JsonProperty("username") val username: String = "",
+        @JsonProperty("subject") val subject: String = "",
     )
 
     data class Response(
         @JsonProperty("rooms") val rooms: List<Room> = arrayListOf()
     )
+}
+
+fun String.unescapeUnicode() = replace("\\\\u([0-9A-Fa-f]{4})".toRegex()) {
+    String(Character.toChars(it.groupValues[1].toInt(radix = 16)))
 }
