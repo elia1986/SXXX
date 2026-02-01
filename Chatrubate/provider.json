@@ -1,8 +1,13 @@
 {
-  "name": "Chatrubate",
-  "className": "ChatrubateProvider",
-  "apiName": "Chatrubate",
-  "providerPath": "com.Chatrubate.ChatrubateProvider",
-  "type": 4,
-  "version": 1
+    "name": "Chatrubate",
+    "className": "ChatrubateProvider",
+    "description": "Chaturbate - Free Adult Webcams, Live Sex, Free Sex Chat, Exhibitionist & Pornstar Free Cams",
+    "author": "luck731",
+    "version": 3,
+    "tvTypes": [
+        "NSFW"
+    ],
+    "iconUrl": "https://web.static.mmcdn.com/images/logo.svg?hash=7c993ccd600a",
+    "language": "en",
+    "providerPath": "com.Chatrubate.ChatrubateProvider"
 }
