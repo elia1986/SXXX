@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 
 class ChatrubateProvider : MainAPI() {
 
@@ -79,20 +80,20 @@ class ChatrubateProvider : MainAPI() {
 
         val html = app.get(data).text
 
-        // Prende qualsiasi HLS presente nella pagina
         val regex = Regex("""https://[^"]+\.m3u8""")
         val m3u8Url = regex.find(html)?.value ?: return false
 
-        callback.invoke(
-            newExtractorLink(
-                this.name,          // source
-                this.name,          // name
-                m3u8Url,            // url
-                mainUrl,            // referer
-                Qualities.Unknown.value,
-                true                // isM3u8
-            )
-        )
+        val link = newExtractorLink(
+            source = name,
+            name = "Live",
+            url = m3u8Url,
+            type = ExtractorLinkType.M3U8
+        ) {
+            referer = mainUrl
+            quality = Qualities.Unknown.value
+        }
+
+        callback.invoke(link)
 
         return true
     }
