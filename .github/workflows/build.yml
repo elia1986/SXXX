@@ -24,18 +24,19 @@ jobs:
       - name: Build with Gradle
         run: chmod +x gradlew && ./gradlew make
         
-      - name: Push to builds
+      - name: Prepare Output
         run: |
-          mkdir -p $GITHUB_WORKSPACE/builds
-          # Cerca il file .cs3 ovunque (quindi anche in Chaturbate/) e lo copia
-          find . -name "*.cs3" -exec cp {} $GITHUB_WORKSPACE/builds/Chaturbate.cs3 \;
-          # Cerca il file plugins.json generato e lo rinomina come vuoi tu
-          find . -name "plugins.json" -exec cp {} $GITHUB_WORKSPACE/builds/SXXX.json \;
+          # Creiamo una cartella pulita chiamata 'publish'
+          mkdir -p publish
+          # Copia il plugin rinominandolo correttamente
+          find . -name "*.cs3" -exec cp {} publish/Chaturbate.cs3 \;
+          # Copia il file json rinominandolo in SXXX.json
+          find . -name "plugins.json" -exec cp {} publish/SXXX.json \;
 
       - name: Deploy to Branch
         uses: s0/git-publish-subdir-action@develop
         env:
           REPO: self
           BRANCH: builds
-          FOLDER: builds
+          FOLDER: publish
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
