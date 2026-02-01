@@ -1,6 +1,5 @@
 package com.Chatrubate
 
-
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.mvvm.logError
@@ -16,38 +15,37 @@ class ChatrubateProvider : MainAPI() {
     override val supportedTypes       = setOf(TvType.NSFW)
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
+    // MODIFICA: Solo Female e Couples. Niente link generici in cima.
     override val mainPage = mainPageOf(
-            "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
-            "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
-        )
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-            var offset : Int
-            if(page == 1)
-            {
-                offset = 0
-            }
-            else
-            {
-                offset = 90 * (page - 1)
-            }
-            val responseList = app.get("$mainUrl${request.data}&offset=$offset").parsedSafe<Response>()!!.rooms.map { room ->
-                newLiveSearchResponse(
-                    name      = room.username,
-                    url       = "$mainUrl/${room.username}",
-                    type      = TvType.Live,
-                ).apply {
-                    this.posterUrl = room.img
-                    this.lang      = null
-                }
-            }
-            return newHomePageResponse(HomePageList(request.name, responseList, isHorizontalImages = true),hasNext = true)
+        "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
+        "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
+    )
 
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        var offset : Int
+        if(page == 1) {
+            offset = 0
+        } else {
+            offset = 90 * (page - 1)
+        }
+        
+        val responseList = app.get("$mainUrl${request.data}&offset=$offset").parsedSafe<Response>()!!.rooms.map { room ->
+            newLiveSearchResponse(
+                name      = room.username,
+                url       = "$mainUrl/${room.username}",
+                type      = TvType.Live,
+            ).apply {
+                this.posterUrl = room.img
+                this.lang      = null
+            }
+        }
+        
+        // isHorizontalImages = true trasforma la lista in righe orizzontali senza banner giganti
+        return newHomePageResponse(HomePageList(request.name, responseList, isHorizontalImages = true), hasNext = true)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-
         val searchResponse = mutableListOf<LiveSearchResponse>()
-
         for (i in 0..3) {
             val results = app.get("$mainUrl/api/ts/roomlist/room-list/?hashtags=$query&limit=90&offset=${i*90}").parsedSafe<Response>()!!.rooms.map { room ->
                 newLiveSearchResponse(
@@ -64,23 +62,18 @@ class ChatrubateProvider : MainAPI() {
             } else {
                 break
             }
-
             if (results.isEmpty()) break
         }
-
         return searchResponse
-
     }
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url).document
-
         val title = document.selectFirst("meta[property=og:title]")?.attr("content")?.trim().toString().replace("| PornHoarder.tv","")
         val poster = fixUrlNull(document.selectFirst("[property='og:image']")?.attr("content"))
         val description = document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
-    
 
-         return newLiveStreamLoadResponse(
+        return newLiveStreamLoadResponse(
             name      = title,
             url       = url,
             dataUrl   = url,
@@ -90,6 +83,7 @@ class ChatrubateProvider : MainAPI() {
         }
     }
 
+    // LOGICA DEI LINK IDENTICA ALLA TUA ORIGINALE
     override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
         val doc = app.get(data).document
         val script = doc.select("script").find { item-> item.html().contains("window.initialRoomDossier") }
@@ -107,8 +101,6 @@ class ChatrubateProvider : MainAPI() {
         } catch (e: Exception) {
             logError(e)
         }
-
-
         return true
     }
 
@@ -117,7 +109,6 @@ class ChatrubateProvider : MainAPI() {
         @JsonProperty("username")  val username: String  = "",
         @JsonProperty("subject")  val subject: String  = "",
         @JsonProperty("tags")  val tags: List<String> = arrayListOf()
-
     )
 
     data class Response(
