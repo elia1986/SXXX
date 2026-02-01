@@ -15,7 +15,7 @@ class ChatrubateProvider : MainAPI() {
     override val supportedTypes       = setOf(TvType.NSFW)
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
-    // Homepage modificata: rimosso Featured, partiamo subito con Female e Couples
+    // 1. Partiamo subito con Female e Couples (Immagine Featured Rimossa)
     override val mainPage = mainPageOf(
         "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
         "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
@@ -23,7 +23,6 @@ class ChatrubateProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val offset = if (page == 1) 0 else 90 * (page - 1)
-        
         val response = app.get("$mainUrl${request.data}&offset=$offset").parsedSafe<Response>()
         val responseList = response?.rooms?.map { room ->
             newLiveSearchResponse(
@@ -89,22 +88,21 @@ class ChatrubateProvider : MainAPI() {
     ): Boolean {
         val doc = app.get(data).document
         val script = doc.select("script").find { it.html().contains("window.initialRoomDossier") }
-        
-        // Estrazione sicura del link m3u8 dal JSON nel codice sorgente
         val json = script?.html()?.substringAfter("window.initialRoomDossier = \"")?.substringBefore(";")?.unescapeUnicode()
         val m3u8Url = "\"hls_source\": \"(.*).m3u8\"".toRegex().find(json ?: "")?.groups?.get(1)?.value
 
         if (m3u8Url != null) {
             try {
+                // 2. Correzione definitiva per Gradle: 4 parametri + blocco config
                 callback.invoke(
                     newExtractorLink(
                         this.name,
                         this.name,
                         "$m3u8Url.m3u8",
-                        "$mainUrl/",
-                        Qualities.Unknown.value,
-                        true
-                    )
+                        ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = "$mainUrl/"
+                    }
                 )
             } catch (e: Exception) {
                 logError(e)
@@ -116,7 +114,6 @@ class ChatrubateProvider : MainAPI() {
     data class Room(
         @JsonProperty("img") val img: String = "",
         @JsonProperty("username") val username: String = "",
-        @JsonProperty("subject") val subject: String = "",
     )
 
     data class Response(
