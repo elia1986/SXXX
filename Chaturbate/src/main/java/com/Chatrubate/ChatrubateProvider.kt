@@ -14,6 +14,7 @@ class ChatrubateProvider : MainAPI() {
     override val supportedTypes       = setOf(TvType.NSFW)
 
     override val mainPage = mainPageOf(
+        "/api/ts/roomlist/room-list/?limit=90" to "Featured",
         "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
         "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
     )
@@ -69,12 +70,12 @@ class ChatrubateProvider : MainAPI() {
         if (m3u8Url != null) {
             callback.invoke(
                 newExtractorLink(
-                    source = this.name,
-                    name = this.name,
-                    url = m3u8Url,
-                    referer = "$mainUrl/",
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true
+                    this.name,
+                    this.name,
+                    m3u8Url,
+                    "$mainUrl/",
+                    Qualities.Unknown.value,
+                    true
                 )
             )
         }
