@@ -3,6 +3,8 @@ package com.Chatrubate
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.Qualities
 
 class ChatrubateProvider : MainAPI() {
     override var mainUrl              = "https://chaturbate.com"
@@ -12,7 +14,6 @@ class ChatrubateProvider : MainAPI() {
     override val supportedTypes       = setOf(TvType.NSFW)
 
     override val mainPage = mainPageOf(
-        "/api/ts/roomlist/room-list/?limit=90" to "Featured",
         "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
         "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
     )
@@ -48,9 +49,8 @@ class ChatrubateProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        // Usiamo newLiveStreamLoadResponse che è ottimizzato per saltare i dettagli extra
         return newLiveStreamLoadResponse(
-            name = url.substringAfterLast("/"),
+            name = url.substringAfterLast("/").replace("/", ""),
             url = url,
             dataUrl = url,
         )
@@ -63,18 +63,17 @@ class ChatrubateProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val doc = app.get(data).text
-        // Estrazione rapida tramite Regex senza caricare tutto il DOM document
         val hlsRegex = """hls_source":\s*"(https:.*?\.m3u8)"""".toRegex()
         val m3u8Url = hlsRegex.find(doc)?.groupValues?.get(1)?.replace("\\u002D", "-")?.replace("\\/", "/")
 
         if (m3u8Url != null) {
             callback.invoke(
-                ExtractorLink(
-                    source = name,
-                    name = name,
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
                     url = m3u8Url,
                     referer = "$mainUrl/",
-                    quality = Qualities.Unknown.value, // Il file M3U8 gestisce le qualità internamente (Adaptive)
+                    quality = Qualities.Unknown.value,
                     isM3u8 = true
                 )
             )
