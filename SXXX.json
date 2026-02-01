@@ -1,8 +1,0 @@
-{
-    "name": "SXXX",
-    "description": "SXXX Repository",
-    "manifestVersion": 1,
-    "pluginLists": [
-      "https://raw.githubusercontent.com/elia1986/SXXX/builds/plugins.json"
-    ]
-  }
