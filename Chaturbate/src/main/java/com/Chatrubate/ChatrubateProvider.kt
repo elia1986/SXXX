@@ -79,18 +79,18 @@ class ChatrubateProvider : MainAPI() {
 
         val html = app.get(data).text
 
-        // Regex robusta per stream HLS
+        // Prende qualsiasi HLS presente nella pagina
         val regex = Regex("""https://[^"]+\.m3u8""")
         val m3u8Url = regex.find(html)?.value ?: return false
 
         callback.invoke(
             newExtractorLink(
-                this.name,
-                this.name,
-                m3u8Url,
-                mainUrl,
+                this.name,          // source
+                this.name,          // name
+                m3u8Url,            // url
+                mainUrl,            // referer
                 Qualities.Unknown.value,
-                true
+                true                // isM3u8
             )
         )
 
