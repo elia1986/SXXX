@@ -11,14 +11,14 @@ class StripProvider : MainAPI() {
     override var lang = "en"
     override val supportedTypes = setOf(TvType.NSFW)
 
-    // L'URL che hai fornito, reso dinamico
+    // Parametri estratti dalla logica v2/doppio
     private val apiParams = "limit=90&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
     override val mainPage = mainPageOf(
-        "/api/front/v2/models?primaryTag=girls&$apiParams" to "Girls",
-        "/api/front/v2/models?primaryTag=couples&$apiParams" to "Couples",
-        "/api/front/v2/models?primaryTag=trans&$apiParams" to "Trans",
-        "/api/front/v2/models?primaryTag=men&$apiParams" to "Men",
+        "girls" to "Girls",
+        "couples" to "Couples",
+        "trans" to "Trans",
+        "men" to "Men",
     )
 
     private fun getHeaders() = mapOf(
@@ -29,17 +29,16 @@ class StripProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // STEP 1: "Svegliamo" il sito visitando la home per i cookie
+        // STEP 1: Richiesta iniziale per stabilire la sessione (Cookie/Cloudflare)
         app.get(mainUrl, headers = getHeaders())
 
-        // STEP 2: Chiamata API reale
+        // STEP 2: Costruzione URL API v2
         val offset = (page - 1) * 90
-        val url = "$mainUrl${request.data}&offset=$offset"
+        val url = "$mainUrl/api/front/v2/models?primaryTag=${request.data}&$apiParams&offset=$offset"
+        
         val res = app.get(url, headers = getHeaders())
         
-        // Debug per i log (lo vedrai con System.out)
-        if (res.text.isBlank()) println("STRIP_DEBUG: Risposta vuota dal server")
-
+        // Parsing sicuro della risposta
         val response = res.parsedSafe<StripResponse>()
         val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
@@ -47,12 +46,13 @@ class StripProvider : MainAPI() {
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                // Ricostruzione URL immagine usando doppiocdn
+                // Logica DoppioCDN per le immagini
                 val thumb = model.previewUrl ?: model.thumbUrl ?: model.preview?.url
                 this.posterUrl = when {
                     thumb == null -> null
                     thumb.startsWith("http") -> thumb
                     thumb.startsWith("//") -> "https:$thumb"
+                    // Se è solo un ID o un path relativo, usiamo il server immagini di doppiocdn
                     else -> "https://img.doppiocdn.net/${thumb.trimStart('/')}"
                 }
             }
@@ -64,14 +64,16 @@ class StripProvider : MainAPI() {
         )
     }
 
-    // Strutture dati JSON
+    // Classi per mappare il JSON (Data Classes)
     data class StripPreview(@JsonProperty("url") val url: String? = null)
+    
     data class StripModel(
         @JsonProperty("username") val username: String? = null,
         @JsonProperty("previewUrl") val previewUrl: String? = null,
         @JsonProperty("thumbUrl") val thumbUrl: String? = null,
         @JsonProperty("preview") val preview: StripPreview? = null,
     )
+
     data class StripResponse(
         @JsonProperty("models") val models: List<StripModel>? = null
     )
