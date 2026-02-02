@@ -13,6 +13,7 @@ class StripProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.NSFW)
 
     // Parametri API specifici per XHamsterLive (v2)
+    // Parametri API specifici per XHamsterLive (v2)
     private val apiParams = "limit=90&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
     override val mainPage = mainPageOf(
