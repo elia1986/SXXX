@@ -11,54 +11,57 @@ class StripProvider : MainAPI() {
     override var lang                 = "en"
     override val supportedTypes       = setOf(TvType.NSFW)
 
+    // Usiamo la base dell'URL che hai fornito
+    // Ho rimosso solo i parametri temporanei come 'watchedIds' o 'uniq' che cambiano sempre
+    private val apiBase = "limit=90&recInFeatured=true&removeShows=true&isRevised=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60&nic=true"
+
     override val mainPage = mainPageOf(
-        "/api/front/v2/models?primaryTag=girls" to "Girls",
-        "/api/front/v2/models?primaryTag=couples" to "Couples",
-        "/api/front/v2/models?primaryTag=men" to "Men",
-        "/api/front/v2/models?primaryTag=trans" to "Trans",
+        "/api/front/v2/models?primaryTag=girls&$apiBase" to "Girls",
+        "/api/front/v2/models?primaryTag=couples&$apiBase" to "Couples",
+        "/api/front/v2/models?primaryTag=men&$apiBase" to "Men",
+        "/api/front/v2/models?primaryTag=trans&$apiBase" to "Trans",
     )
 
-    private fun getHeaders(): Map<String, String> {
-        return mapOf(
-            "X-Requested-With" to "XMLHttpRequest",
-            "Referer" to "$mainUrl/",
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Accept" to "application/json, text/plain, */*"
-        )
-    }
+    private fun getHeaders() = mapOf(
+        "X-Requested-With" to "XMLHttpRequest",
+        "Referer" to "$mainUrl/",
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept" to "application/json"
+    )
 
+    // Funzione specifica per riparare gli URL delle immagini doppiocdn
     private fun fixUrl(url: String?): String? {
         if (url.isNullOrBlank()) return null
         return when {
             url.startsWith("http") -> url
             url.startsWith("//") -> "https:$url"
-            else -> "https://img.doppiocdn.net${if (url.startsWith("/")) "" else "/"}$url"
+            // Se l'URL è solo un path (es. /thumbs/...) aggiungiamo il dominio che hai trovato
+            else -> "https://img.doppiocdn.net/${url.removePrefix("/")}"
         }
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val limit = 90
-        val offset = (page - 1) * limit
-        // Aggiungiamo i parametri che abbiamo visto nel tuo URL originale
-        val url = "$mainUrl${request.data}&limit=$limit&offset=$offset&nic=true&isRevised=true"
+        val offset = (page - 1) * 90
+        val finalUrl = "$mainUrl${request.data}&offset=$offset"
         
-        val res = app.get(url, headers = getHeaders())
+        val res = app.get(finalUrl, headers = getHeaders())
         
-        // Se la risposta è vuota, logghiamo per debug interno
-        if (res.text.isBlank()) return newHomePageResponse(emptyList<HomePageList>(), false)
-
+        // Se non vedi nomi, stampiamo la risposta nei log (per debug)
         val response = res.parsedSafe<StripResponse>()
-        val responseList = response?.models?.map { model ->
+        
+        // Se 'models' è nullo, proviamo a vedere se i dati sono dentro un altro campo
+        val modelsList = response?.models ?: emptyList()
+
+        val responseList = modelsList.map { model ->
             newLiveSearchResponse(
                 name = model.username ?: "Unknown",
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                // Proviamo a ricostruire l'immagine dal thumbUrl o previewUrl
-                val rawImg = model.previewUrl ?: model.thumbUrl ?: model.preview?.url
-                this.posterUrl = fixUrl(rawImg)
+                // Cerchiamo l'immagine in tutti i campi possibili forniti dal JSON
+                this.posterUrl = fixUrl(model.previewUrl ?: model.thumbUrl ?: model.preview?.url)
             }
-        } ?: emptyList()
+        }
 
         return newHomePageResponse(
             HomePageList(request.name, responseList, isHorizontalImages = true),
@@ -66,7 +69,10 @@ class StripProvider : MainAPI() {
         )
     }
 
-    data class StripPreview(@JsonProperty("url") val url: String? = null)
+    // Classi per il parsing del JSON basate sulla struttura API v2
+    data class StripPreview(
+        @JsonProperty("url") val url: String? = null
+    )
 
     data class StripModel(
         @JsonProperty("username") val username: String? = null,
