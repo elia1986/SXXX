@@ -5,7 +5,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.*
 
-class ChatrubateProvider : MainAPI() {
+class StripProvider : MainAPI() {
     override var mainUrl              = "https://stripchat.com/"
     override var name                 = "Strip"
     override val hasMainPage          = true
