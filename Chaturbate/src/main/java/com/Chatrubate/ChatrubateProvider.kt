@@ -16,10 +16,12 @@ class ChatrubateProvider : MainAPI() {
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
     // MODIFICA: Solo Female e Couples. Niente link generici in cima.
-    override val mainPage = mainPageOf(
+override val mainPage = mainPageOf(
         "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
         "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
-        "/api/ts/roomlist/room-list/?tgas=italian&limit=90" to "Couples",
+        "/api/ts/roomlist/room-list/?hashtags=italian&limit=90" to "Italians",
+        "/api/ts/roomlist/room-list/?hashtags=hairy&limit=90" to "Hairy",
+        "/api/ts/roomlist/room-list/?hashtags=blowjob&limit=90" to "Blow",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
