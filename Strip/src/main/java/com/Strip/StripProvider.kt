@@ -5,13 +5,14 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class StripProvider : MainAPI() {
-    override var mainUrl = "https://stripchat.com"
+    // Cambiamo l'URL base a XHamsterLive come richiesto
+    override var mainUrl = "https://xhamsterlive.com"
     override var name = "Strip"
     override val hasMainPage = true
     override var lang = "en"
     override val supportedTypes = setOf(TvType.NSFW)
 
-    // Parametri estratti dalla logica v2/doppio
+    // Parametri API specifici per XHamsterLive (v2)
     private val apiParams = "limit=90&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
     override val mainPage = mainPageOf(
@@ -29,16 +30,16 @@ class StripProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // STEP 1: Richiesta iniziale per stabilire la sessione (Cookie/Cloudflare)
+        // STEP 1: Inizializzazione sessione per gestire i cookie di XHamsterLive
         app.get(mainUrl, headers = getHeaders())
 
-        // STEP 2: Costruzione URL API v2
+        // STEP 2: Chiamata all'endpoint v2
         val offset = (page - 1) * 90
         val url = "$mainUrl/api/front/v2/models?primaryTag=${request.data}&$apiParams&offset=$offset"
         
         val res = app.get(url, headers = getHeaders())
         
-        // Parsing sicuro della risposta
+        // Parsing della risposta JSON
         val response = res.parsedSafe<StripResponse>()
         val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
@@ -46,13 +47,12 @@ class StripProvider : MainAPI() {
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                // Logica DoppioCDN per le immagini
+                // Utilizziamo il server immagini doppiocdn.net citato nel codice di rikacelery
                 val thumb = model.previewUrl ?: model.thumbUrl ?: model.preview?.url
                 this.posterUrl = when {
                     thumb == null -> null
                     thumb.startsWith("http") -> thumb
                     thumb.startsWith("//") -> "https:$thumb"
-                    // Se è solo un ID o un path relativo, usiamo il server immagini di doppiocdn
                     else -> "https://img.doppiocdn.net/${thumb.trimStart('/')}"
                 }
             }
@@ -64,7 +64,7 @@ class StripProvider : MainAPI() {
         )
     }
 
-    // Classi per mappare il JSON (Data Classes)
+    // Strutture dati per il mapping del JSON di XHamsterLive
     data class StripPreview(@JsonProperty("url") val url: String? = null)
     
     data class StripModel(
