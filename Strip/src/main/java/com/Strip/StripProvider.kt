@@ -15,13 +15,14 @@ class StripProvider : MainAPI() {
     override val supportedTypes       = setOf(TvType.NSFW)
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
-    // Configurazione Homepage Stripchat
+    // Configurazione Homepage Stripchat con i tag corretti
     override val mainPage = mainPageOf(
         "/api/front/v2/models?primaryGenre=female&limit=90" to "Female",
         "/api/front/v2/models?primaryGenre=couple&limit=90" to "Couples",
         "/api/front/v2/models?primaryGenre=female&tag=anal&limit=90" to "Female Anal",
         "/api/front/v2/models?primaryGenre=female&tag=italian&limit=90" to "Italians",
         "/api/front/v2/models?primaryGenre=female&tag=bigBoobs&limit=90" to "BigB",
+        "/api/front/v2/models?primaryGenre=female&tag=hairy&limit=90" to "Hair",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -53,7 +54,7 @@ class StripProvider : MainAPI() {
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                this.posterUrl = model.previewUrl
+                this.posterUrl = model.previewUrl ?: model.thumbUrl
             }
         } ?: emptyList()
     }
@@ -62,6 +63,7 @@ class StripProvider : MainAPI() {
         val document = app.get(url).document
         val title = document.selectFirst("h1")?.text() ?: "Strip Live"
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
+        val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
         return newLiveStreamLoadResponse(
             name = title,
@@ -69,6 +71,7 @@ class StripProvider : MainAPI() {
             dataUrl = url,
         ).apply {
             this.posterUrl = poster
+            this.plot = description
         }
     }
 
@@ -79,29 +82,35 @@ class StripProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val doc = app.get(data).document
-        // Stripchat espone i dati della room in un JSON dentro uno script
+        // Cerchiamo lo script che contiene lo stato iniziale della stanza
         val script = doc.select("script").find { it.html().contains("window.__PRELOADED_STATE__") }
         val html = script?.html() ?: return false
         
-        // Estrazione URL HLS dalla configurazione precaricata
+        // Estrazione URL HLS tramite Regex
         val hlsUrl = "\"hlsStreamUrl\":\"(.*?)\"".toRegex().find(html)?.groups?.get(1)?.value
             ?.replace("\\u002F", "/")
 
         if (hlsUrl != null) {
-            callback.invoke(
-                newExtractorLink(
-                    source = this.name,
-                    name = this.name,
-                    url = hlsUrl,
-                    referer = "$mainUrl/",
-                    type = ExtractorLinkType.M3U8
+            try {
+                callback.invoke(
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = hlsUrl,
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        // Spostato qui dentro per compatibilità con l'SDK
+                        this.referer = "$mainUrl/"
+                    }
                 )
-            )
+            } catch (e: Exception) {
+                logError(e)
+            }
         }
         return true
     }
 
-    // Classi per il parsing JSON di Stripchat
+    // Data classes per il parsing dell'API di Stripchat
     data class StripModel(
         @JsonProperty("username") val username: String? = null,
         @JsonProperty("previewUrl") val previewUrl: String? = null,
