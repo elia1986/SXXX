@@ -9,13 +9,14 @@ class StripProvider : MainAPI() {
     override var name                 = "Strip"
     override val hasMainPage          = true
     override var lang                 = "en"
-    override val hasDownloadSupport   = true
-    override val hasChromecastSupport = true
     override val supportedTypes       = setOf(TvType.NSFW)
 
+    // Configurazione categorie basata sul parametro primaryTag
     override val mainPage = mainPageOf(
         "/api/front/v2/models?primaryTag=girls&limit=90" to "Girls",
         "/api/front/v2/models?primaryTag=couples&limit=90" to "Couples",
+        "/api/front/v2/models?primaryTag=men&limit=90" to "Men",
+        "/api/front/v2/models?primaryTag=trans&limit=90" to "Trans",
         "/api/front/v2/models?primaryTag=girls&tag=italian&limit=90" to "Italians",
     )
 
@@ -25,72 +26,44 @@ class StripProvider : MainAPI() {
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     )
 
+    // Logica specifica per le immagini doppiocdn
     private fun fixUrl(url: String?): String? {
         if (url == null) return null
         return when {
             url.startsWith("http") -> url
             url.startsWith("//") -> "https:$url"
+            // Se l'API restituisce solo /thumbs/..., aggiungiamo il dominio corretto
             url.startsWith("/thumbs") -> "https://img.doppiocdn.net$url"
             else -> url
         }
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        // Calcolo offset per la paginazione
         val offset = if (page <= 1) 0 else 90 * (page - 1)
         val url = "$mainUrl${request.data}&offset=$offset&nic=true"
         
         val response = app.get(url, headers = getHeaders()).parsedSafe<StripResponse>()
+        
         val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
-                name = model.username ?: "",
+                name = model.username ?: "Unknown",
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                this.posterUrl = fixUrl(model.previewUrl ?: model.preview?.url ?: model.thumbUrl)
+                // Proviamo a estrarre l'immagine dai vari campi JSON
+                val rawImg = model.previewUrl ?: model.preview?.url ?: model.thumbUrl
+                this.posterUrl = fixUrl(rawImg)
             }
         } ?: emptyList()
 
-        return newHomePageResponse(HomePageList(request.name, responseList, isHorizontalImages = true), hasNext = true)
+        return newHomePageResponse(
+            HomePageList(request.name, responseList, isHorizontalImages = true),
+            hasNext = true
+        )
     }
 
-    override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url, headers = getHeaders()).document
-        val title = document.selectFirst("meta[property='og:title']")?.attr("content") ?: "Strip Live"
-        val poster = fixUrl(document.selectFirst("meta[property='og:image']")?.attr("content"))
-
-        return newLiveStreamLoadResponse(title, url, url).apply {
-            this.posterUrl = poster
-        }
-    }
-
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val html = app.get(data, headers = getHeaders()).text
-        
-        val hlsRegex = """hlsStreamUrl"[:\s]+"(https?[^"]+\.m3u8[^"]*)""".toRegex()
-        val match = hlsRegex.find(html)?.groups?.get(1)?.value
-        val hlsUrl = match?.replace("\\/", "/")?.replace("\\u002F", "/")
-
-        if (!hlsUrl.isNullOrBlank()) {
-            // Usiamo i nomi dei parametri per non sbagliare ordine e tipo
-            callback.invoke(
-                newExtractorLink(
-                    source = this.name,
-                    name = this.name,
-                    url = hlsUrl,
-                    referer = "$mainUrl/",
-                    type = ExtractorLinkType.M3U8
-                )
-            )
-            return true
-        }
-        return false
-    }
-
+    // Classi per mappare il JSON dell'API
     data class StripPreview(
         @JsonProperty("url") val url: String? = null
     )
