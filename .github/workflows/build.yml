@@ -29,11 +29,12 @@ jobs:
           # 1. Creiamo la cartella temporanea pulita
           mkdir -p publish
 
-          # 2. Copia il plugin compilato cercandolo nelle cartelle di build
-          find . -name "*.cs3" -exec cp {} publish/Chaturbate.cs3 \;
+          # 2. Copia TUTTI i plugin compilati (.cs3) trovati nelle sottocartelle
+          # Questo comando gestisce automaticamente sia Chaturbate che Strip
+          find . -name "*.cs3" -exec cp {} publish/ \;
 
-          # 3. Copia i file JSON esattamente come sono nel master
-          # Usiamo 'cp' semplice perché i file si trovano nella root del progetto
+          # 3. Copia i file JSON di indice
+          # Assicurati che questi file siano aggiornati con i riferimenti a entrambi i plugin
           cp plugins.json publish/plugins.json
           cp SXXX.json publish/SXXX.json
 
