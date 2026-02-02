@@ -11,62 +11,62 @@ class StripProvider : MainAPI() {
     override var lang                 = "en"
     override val supportedTypes       = setOf(TvType.NSFW)
 
-    // Configurazione categorie basata sul parametro primaryTag
     override val mainPage = mainPageOf(
-        "/api/front/v2/models?primaryTag=girls&limit=90" to "Girls",
-        "/api/front/v2/models?primaryTag=couples&limit=90" to "Couples",
-        "/api/front/v2/models?primaryTag=men&limit=90" to "Men",
-        "/api/front/v2/models?primaryTag=trans&limit=90" to "Trans",
-        "/api/front/v2/models?primaryTag=girls&tag=italian&limit=90" to "Italians",
+        "/api/front/v2/models?primaryTag=girls" to "Girls",
+        "/api/front/v2/models?primaryTag=couples" to "Couples",
+        "/api/front/v2/models?primaryTag=men" to "Men",
+        "/api/front/v2/models?primaryTag=trans" to "Trans",
     )
 
-    private fun getHeaders() = mapOf(
-        "X-Requested-With" to "XMLHttpRequest",
-        "Referer" to "$mainUrl/",
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    )
+    private fun getHeaders(): Map<String, String> {
+        return mapOf(
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to "$mainUrl/",
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Accept" to "application/json, text/plain, */*"
+        )
+    }
 
-    // Logica specifica per le immagini doppiocdn
     private fun fixUrl(url: String?): String? {
-        if (url == null) return null
+        if (url.isNullOrBlank()) return null
         return when {
             url.startsWith("http") -> url
             url.startsWith("//") -> "https:$url"
-            // Se l'API restituisce solo /thumbs/..., aggiungiamo il dominio corretto
-            url.startsWith("/thumbs") -> "https://img.doppiocdn.net$url"
-            else -> url
+            else -> "https://img.doppiocdn.net${if (url.startsWith("/")) "" else "/"}$url"
         }
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // Calcolo offset per la paginazione
-        val offset = if (page <= 1) 0 else 90 * (page - 1)
-        val url = "$mainUrl${request.data}&offset=$offset&nic=true"
+        val limit = 90
+        val offset = (page - 1) * limit
+        // Aggiungiamo i parametri che abbiamo visto nel tuo URL originale
+        val url = "$mainUrl${request.data}&limit=$limit&offset=$offset&nic=true&isRevised=true"
         
-        val response = app.get(url, headers = getHeaders()).parsedSafe<StripResponse>()
+        val res = app.get(url, headers = getHeaders())
         
+        // Se la risposta è vuota, logghiamo per debug interno
+        if (res.text.isBlank()) return newHomePageResponse(emptyList<HomePageList>(), false)
+
+        val response = res.parsedSafe<StripResponse>()
         val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
                 name = model.username ?: "Unknown",
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                // Proviamo a estrarre l'immagine dai vari campi JSON
-                val rawImg = model.previewUrl ?: model.preview?.url ?: model.thumbUrl
+                // Proviamo a ricostruire l'immagine dal thumbUrl o previewUrl
+                val rawImg = model.previewUrl ?: model.thumbUrl ?: model.preview?.url
                 this.posterUrl = fixUrl(rawImg)
             }
         } ?: emptyList()
 
         return newHomePageResponse(
             HomePageList(request.name, responseList, isHorizontalImages = true),
-            hasNext = true
+            hasNext = responseList.isNotEmpty()
         )
     }
 
-    // Classi per mappare il JSON dell'API
-    data class StripPreview(
-        @JsonProperty("url") val url: String? = null
-    )
+    data class StripPreview(@JsonProperty("url") val url: String? = null)
 
     data class StripModel(
         @JsonProperty("username") val username: String? = null,
@@ -76,6 +76,6 @@ class StripProvider : MainAPI() {
     )
 
     data class StripResponse(
-        @JsonProperty("models") val models: List<StripModel> = emptyList()
+        @JsonProperty("models") val models: List<StripModel>? = null
     )
 }
