@@ -19,10 +19,11 @@ class ChatrubateProvider : MainAPI() {
 override val mainPage = mainPageOf(
         "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
         "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
-        "/api/ts/roomlist/room-list/?hashtags=italian&limit=90" to "Italians",
-        "/api/ts/roomlist/room-list/?hashtags=hairy&limit=90" to "Hairy",
-        "/api/ts/roomlist/room-list/?hashtags=blowjob&limit=90" to "Blow",
-    )
+        "/api/ts/roomlist/room-list/?genders=f&hashtags=anal&limit=90" to "Anal",
+        "/api/ts/roomlist/room-list/?genders=f&hashtags=italian&limit=90" to "Italians",
+        "/api/ts/roomlist/room-list/?genders=f&hashtags=bigboobs&limit=90" to "BigB",
+        "/api/ts/roomlist/room-list/?genders=f&hashtags=hairy&limit=90" to "Hair",
+)
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         var offset : Int
