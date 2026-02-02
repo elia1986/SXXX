@@ -1,4 +1,4 @@
-package com.Chatrubate
+package com.Strip
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
