@@ -6,7 +6,7 @@ import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.*
 
 class StripProvider : MainAPI() {
-    override var mainUrl              = "https://stripchat.com/"
+    override var mainUrl              = "https://stripchat.com"
     override var name                 = "Strip"
     override val hasMainPage          = true
     override var lang                 = "en"
@@ -15,114 +15,100 @@ class StripProvider : MainAPI() {
     override val supportedTypes       = setOf(TvType.NSFW)
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
-    // MODIFICA: Solo Female e Couples. Niente link generici in cima.
-override val mainPage = mainPageOf(
-        "/api/ts/roomlist/room-list/?genders=f&limit=90" to "Female",
-        "/api/ts/roomlist/room-list/?genders=c&limit=90" to "Couples",
-        "/api/ts/roomlist/room-list/?genders=f&hashtags=anal&limit=90" to "Anal",
-        "/api/ts/roomlist/room-list/?genders=f&hashtags=italian&limit=90" to "Italians",
-        "/api/ts/roomlist/room-list/?genders=f&hashtags=bigboobs&limit=90" to "BigB",
-        "/api/ts/roomlist/room-list/?genders=f&hashtags=hairy&limit=90" to "Hair",
-)
+    // Configurazione Homepage Stripchat
+    override val mainPage = mainPageOf(
+        "/api/front/v2/models?primaryGenre=female&limit=90" to "Female",
+        "/api/front/v2/models?primaryGenre=couple&limit=90" to "Couples",
+        "/api/front/v2/models?primaryGenre=female&tag=anal&limit=90" to "Female Anal",
+        "/api/front/v2/models?primaryGenre=female&tag=italian&limit=90" to "Italians",
+        "/api/front/v2/models?primaryGenre=female&tag=bigBoobs&limit=90" to "BigB",
+    )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        var offset : Int
-        if(page == 1) {
-            offset = 0
-        } else {
-            offset = 90 * (page - 1)
-        }
+        val offset = if (page <= 1) 0 else 90 * (page - 1)
+        val url = "$mainUrl${request.data}&offset=$offset"
         
-        val responseList = app.get("$mainUrl${request.data}&offset=$offset").parsedSafe<Response>()!!.rooms.map { room ->
+        val response = app.get(url).parsedSafe<StripResponse>()
+        val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
-                name      = room.username,
-                url       = "$mainUrl/${room.username}",
-                type      = TvType.Live,
+                name = model.username ?: "",
+                url = "$mainUrl/${model.username}",
+                type = TvType.Live,
             ).apply {
-                this.posterUrl = room.img
-                this.lang      = null
+                this.posterUrl = model.previewUrl ?: model.thumbUrl
             }
-        }
-        
-        // isHorizontalImages = true trasforma la lista in righe orizzontali senza banner giganti
-        return newHomePageResponse(HomePageList(request.name, responseList, isHorizontalImages = true), hasNext = true)
+        } ?: emptyList()
+
+        return newHomePageResponse(
+            HomePageList(request.name, responseList, isHorizontalImages = true),
+            hasNext = true
+        )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchResponse = mutableListOf<LiveSearchResponse>()
-        for (i in 0..3) {
-            val results = app.get("$mainUrl/api/ts/roomlist/room-list/?hashtags=$query&limit=90&offset=${i*90}").parsedSafe<Response>()!!.rooms.map { room ->
-                newLiveSearchResponse(
-                    name      = room.username,
-                    url       = "$mainUrl/${room.username}",
-                ).apply {
-                    this.type      = TvType.Live
-                    this.posterUrl = room.img
-                    this.lang = null
-                }
+        val response = app.get("$mainUrl/api/front/v2/models?query=$query&limit=90").parsedSafe<StripResponse>()
+        return response?.models?.map { model ->
+            newLiveSearchResponse(
+                name = model.username ?: "",
+                url = "$mainUrl/${model.username}",
+                type = TvType.Live,
+            ).apply {
+                this.posterUrl = model.previewUrl
             }
-            if (!searchResponse.containsAll(results)) {
-                searchResponse.addAll(results)
-            } else {
-                break
-            }
-            if (results.isEmpty()) break
-        }
-        return searchResponse
+        } ?: emptyList()
     }
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url).document
-        val title = document.selectFirst("meta[property=og:title]")?.attr("content")?.trim().toString().replace("| PornHoarder.tv","")
-        val poster = fixUrlNull(document.selectFirst("[property='og:image']")?.attr("content"))
-        val description = document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
+        val title = document.selectFirst("h1")?.text() ?: "Strip Live"
+        val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
 
         return newLiveStreamLoadResponse(
-            name      = title,
-            url       = url,
-            dataUrl   = url,
+            name = title,
+            url = url,
+            dataUrl = url,
         ).apply {
             this.posterUrl = poster
-            this.plot      = description
         }
     }
 
-    // LOGICA DEI LINK IDENTICA ALLA TUA ORIGINALE
-    override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
         val doc = app.get(data).document
-        val script = doc.select("script").find { item-> item.html().contains("window.initialRoomDossier") }
-        val json = script!!.html().substringAfter("window.initialRoomDossier = \"").substringBefore(";").unescapeUnicode()
-        val m3u8Url = "\"hls_source\": \"(.*).m3u8\"".toRegex().find(json)?.groups?.get(1)?.value
-        try {
+        // Stripchat espone i dati della room in un JSON dentro uno script
+        val script = doc.select("script").find { it.html().contains("window.__PRELOADED_STATE__") }
+        val html = script?.html() ?: return false
+        
+        // Estrazione URL HLS dalla configurazione precaricata
+        val hlsUrl = "\"hlsStreamUrl\":\"(.*?)\"".toRegex().find(html)?.groups?.get(1)?.value
+            ?.replace("\\u002F", "/")
+
+        if (hlsUrl != null) {
             callback.invoke(
                 newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = m3u8Url.toString()+".m3u8",
+                    source = this.name,
+                    name = this.name,
+                    url = hlsUrl,
+                    referer = "$mainUrl/",
                     type = ExtractorLinkType.M3U8
                 )
             )
-        } catch (e: Exception) {
-            logError(e)
         }
         return true
     }
 
-    data class Room(
-        @JsonProperty("img")    val img: String       = "",
-        @JsonProperty("username")  val username: String  = "",
-        @JsonProperty("subject")  val subject: String  = "",
-        @JsonProperty("tags")  val tags: List<String> = arrayListOf()
+    // Classi per il parsing JSON di Stripchat
+    data class StripModel(
+        @JsonProperty("username") val username: String? = null,
+        @JsonProperty("previewUrl") val previewUrl: String? = null,
+        @JsonProperty("thumbUrl") val thumbUrl: String? = null,
     )
 
-    data class Response(
-        @JsonProperty("all_rooms_count") val all_rooms_count: String      = "",
-        @JsonProperty("room_list_id")   val room_list_id: String        = "",
-        @JsonProperty("total_count")   val total_count: String        = "",
-        @JsonProperty("rooms")  val rooms: List<Room> = arrayListOf()
+    data class StripResponse(
+        @JsonProperty("models") val models: List<StripModel> = emptyList()
     )
-}
-
-fun String.unescapeUnicode() = replace("\\\\u([0-9A-Fa-f]{4})".toRegex()) {
-    String(Character.toChars(it.groupValues[1].toInt(radix = 16)))
 }
