@@ -25,13 +25,11 @@ class StripProvider : MainAPI() {
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     )
 
-    // Funzione potenziata per le immagini basata sul tuo esempio doppiocdn
     private fun fixUrl(url: String?): String? {
         if (url == null) return null
         return when {
             url.startsWith("http") -> url
             url.startsWith("//") -> "https:$url"
-            // Se l'URL sembra un percorso relativo, lo puntiamo al CDN che mi hai indicato
             url.startsWith("/thumbs") -> "https://img.doppiocdn.net$url"
             else -> url
         }
@@ -48,9 +46,7 @@ class StripProvider : MainAPI() {
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                // Proviamo a pescare l'immagine da tutti i campi possibili
-                val rawImg = model.previewUrl ?: model.preview?.url ?: model.thumbUrl
-                this.posterUrl = fixUrl(rawImg)
+                this.posterUrl = fixUrl(model.previewUrl ?: model.preview?.url ?: model.thumbUrl)
             }
         } ?: emptyList()
 
@@ -80,14 +76,13 @@ class StripProvider : MainAPI() {
         val hlsUrl = match?.replace("\\/", "/")?.replace("\\u002F", "/")
 
         if (!hlsUrl.isNullOrBlank()) {
-            // USIAMO IL COSTRUTTORE DIRETTO PER EVITARE ERRORI DI COMPILAZIONE
+            // Usiamo i nomi dei parametri per non sbagliare ordine e tipo
             callback.invoke(
-                ExtractorLink(
+                newExtractorLink(
                     source = this.name,
                     name = this.name,
                     url = hlsUrl,
                     referer = "$mainUrl/",
-                    quality = Qualities.P1080.value, // Forziamo una qualità
                     type = ExtractorLinkType.M3U8
                 )
             )
