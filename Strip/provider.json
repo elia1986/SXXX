@@ -1,0 +1,13 @@
+{
+    "name": "Strip",
+    "className": "Striprovider",
+    "description": "Strip - Free Adult Webcams, Live Sex, Free Sex Chat, Exhibitionist & Pornstar Free Cams",
+    "author": "luck731",
+    "version": 4,
+    "tvTypes": [
+        "NSFW"
+    ],
+    "iconUrl": "https://web.static.mmcdn.com/images/logo.svg?hash=7c993ccd600a",
+    "language": "en",
+    "providerPath": "com.Strip.StripProvider"
+}
