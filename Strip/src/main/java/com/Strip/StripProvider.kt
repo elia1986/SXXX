@@ -15,57 +15,62 @@ class StripProvider : MainAPI() {
     override val supportedTypes       = setOf(TvType.NSFW)
     override val vpnStatus            = VPNStatus.MightBeNeeded
 
+    // Aggiornato con primaryTag come visto nel tuo URL
     override val mainPage = mainPageOf(
-        "/api/front/v2/models?primaryGenre=female&limit=90" to "Female",
-        "/api/front/v2/models?primaryGenre=couple&limit=90" to "Couples",
-        "/api/front/v2/models?primaryGenre=female&tag=anal&limit=90" to "Female Anal",
-        "/api/front/v2/models?primaryGenre=female&tag=italian&limit=90" to "Italians",
-        "/api/front/v2/models?primaryGenre=female&tag=bigBoobs&limit=90" to "BigB",
+        "/api/front/v2/models?primaryTag=girls&limit=90" to "Girls",
+        "/api/front/v2/models?primaryTag=couples&limit=90" to "Couples",
+        "/api/front/v2/models?primaryTag=girls&tag=italian&limit=90" to "Italians",
+        "/api/front/v2/models?primaryTag=girls&tag=anal&limit=90" to "Anal",
+        "/api/front/v2/models?primaryTag=girls&tag=bigBoobs&limit=90" to "BigB",
     )
+
+    private fun getHeaders(): Map<String, String> {
+        return mapOf(
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to "$mainUrl/",
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+    }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val offset = if (page <= 1) 0 else 90 * (page - 1)
-        val url = "$mainUrl${request.data}&offset=$offset"
+        val url = "$mainUrl${request.data}&offset=$offset&nic=true"
         
-        val response = app.get(url).parsedSafe<StripResponse>()
+        // Usiamo gli headers per "fingere" di essere il sito stesso
+        val response = app.get(url, headers = getHeaders()).parsedSafe<StripResponse>()
         val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
                 name = model.username ?: "",
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                // Tentiamo vari campi per l'immagine
-                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: model.snapshotUrl ?: model.avatarUrl
+                // Proviamo a prendere l'URL in ogni modo possibile
+                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: model.preview?.url
             }
         } ?: emptyList()
 
-        return newHomePageResponse(
-            HomePageList(request.name, responseList, isHorizontalImages = true),
-            hasNext = true
-        )
+        return newHomePageResponse(HomePageList(request.name, responseList, isHorizontalImages = true), hasNext = true)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val response = app.get("$mainUrl/api/front/v2/models?query=$query&limit=90").parsedSafe<StripResponse>()
+        val url = "$mainUrl/api/front/v2/models?query=$query&limit=90&nic=true"
+        val response = app.get(url, headers = getHeaders()).parsedSafe<StripResponse>()
         return response?.models?.map { model ->
             newLiveSearchResponse(
                 name = model.username ?: "",
                 url = "$mainUrl/${model.username}",
                 type = TvType.Live,
             ).apply {
-                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: model.snapshotUrl
+                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: model.preview?.url
             }
         } ?: emptyList()
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val response = app.get(url)
+        val response = app.get(url, headers = getHeaders())
         val document = response.document
-        
-        // Estrazione dati dai meta tag (presenti nel sorgente che hai inviato)
         val title = document.selectFirst("meta[property='og:title']")?.attr("content") ?: "Strip Live"
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
-        val description = document.selectFirst("meta[name='description']")?.attr("content")
 
         return newLiveStreamLoadResponse(
             name = title,
@@ -73,7 +78,6 @@ class StripProvider : MainAPI() {
             dataUrl = url,
         ).apply {
             this.posterUrl = poster
-            this.plot = description
         }
     }
 
@@ -83,40 +87,33 @@ class StripProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val response = app.get(data)
-        val html = response.text
+        val html = app.get(data, headers = getHeaders()).text
         
-        // Regex migliorata per catturare l'URL HLS anche con caratteri di escape
-        val hlsRegex = """hlsStreamUrl"[:\s]+"(https?[:\\/]+[^"]+\.m3u8[^"]*)""".toRegex()
-        val match = hlsRegex.find(html)?.groups?.get(1)?.value
+        // Regex super-flessibile per catturare i domini doppiocdn o edge-hls
+        val hlsRegex = """hlsStreamUrl"[:\s]+"(https?[^"]+\.m3u8[^"]*)""".toRegex()
+        val rawUrl = hlsRegex.find(html)?.groups?.get(1)?.value
         
-        val hlsUrl = match?.replace("\\/", "/")?.replace("\\u002F", "/")
+        val hlsUrl = rawUrl?.replace("\\/", "/")?.replace("\\u002F", "/")
 
         if (!hlsUrl.isNullOrBlank()) {
             callback.invoke(
-                newExtractorLink(
-                    source = this.name,
-                    name = this.name,
-                    url = hlsUrl,
-                    type = ExtractorLinkType.M3U8
-                ) {
-                    this.referer = "$mainUrl/"
-                    // Aggiungiamo un User-Agent comune per evitare blocchi
-                    this.headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                }
+                newExtractorLink(name, name, hlsUrl, "$mainUrl/", ExtractorLinkType.M3U8)
             )
             return true
         }
         return false
     }
 
-    // Classi JSON aggiornate con più campi per le immagini
+    // Classi JSON potenziate
+    data class StripPreview(
+        @JsonProperty("url") val url: String? = null
+    )
+
     data class StripModel(
         @JsonProperty("username") val username: String? = null,
         @JsonProperty("previewUrl") val previewUrl: String? = null,
         @JsonProperty("thumbUrl") val thumbUrl: String? = null,
-        @JsonProperty("snapshotUrl") val snapshotUrl: String? = null,
-        @JsonProperty("avatarUrl") val avatarUrl: String? = null,
+        @JsonProperty("preview") val preview: StripPreview? = null, // Per oggetti annidati
     )
 
     data class StripResponse(
