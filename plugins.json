@@ -37,4 +37,23 @@
         "url": "https://raw.githubusercontent.com/elia1986/SXXX/builds/Chaturbate.cs3",
         "name": "Chatrubate"
     }
+        {
+        "iconUrl": "https://web.static.mmcdn.com/images/logo.svg?hash=7c993ccd600a",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/elia1986/SXXX",
+        "fileSize": 12025,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "luck731"
+        ],
+        "tvTypes": [
+            "NSFW"
+        ],
+        "version": 3,
+        "internalName": "Strip",
+        "description": "Strip - Free Adult Webcams, Live Sex, Free Sex Chat, Exhibitionist & Pornstar Free Cams",
+        "url": "https://raw.githubusercontent.com/elia1986/SXXX/builds/Strip.cs3",
+        "name": "Strip"
+    }
 ]
