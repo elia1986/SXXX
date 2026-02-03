@@ -73,7 +73,6 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-        // Il terzo parametro deve essere una String (dataUrl)
         return newLiveStreamLoadResponse(title, url, url).apply {
             this.posterUrl = poster
             this.plot = description
@@ -100,24 +99,17 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // UTILIZZO DELLA FIRMA ESATTA RICHIESTA DAL TUO COMPILATORE:
-            // 1. source: String
-            // 2. name: String
-            // 3. url: String
-            // 4. type: ExtractorLinkType? (mettiamo null per usare il default)
-            // 5. initializer: Blocco Lambda ( { ... } )
-            callback.invoke(
-                newExtractorLink(
-                    this.name, 
-                    this.name, 
-                    m3u8Url, 
-                    null
-                ) {
-                    this.referer = data
-                    this.quality = Qualities.Unknown.value
-                    this.isM3u8 = true
-                }
+            // LA SOLUZIONE KOTLIN:
+            // 1. Creiamo l'oggetto base con i 3 parametri obbligatori (String)
+            // 2. Usiamo .copy() per "sovrascrivere" le proprietà immutabili (val)
+            // Questo evita sia l'errore 'val cannot be reassigned' che il 'deprecated'
+            val extractorLink = newExtractorLink(this.name, this.name, m3u8Url).copy(
+                referer = data,
+                quality = Qualities.Unknown.value,
+                isM3u8 = true
             )
+
+            callback.invoke(extractorLink)
             return true
         }
         return false
