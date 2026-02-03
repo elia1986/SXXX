@@ -3,6 +3,7 @@ package com.Strip
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 
 class StripProvider : MainAPI() {
     override var mainUrl = "https://xhamsterlive.com"
@@ -73,14 +74,12 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-        // In pre-release, il terzo parametro DEVE essere una String (dataUrl)
         return newLiveStreamLoadResponse(title, url, url).apply {
             this.posterUrl = poster
             this.plot = description
         }
     }
 
-    @Suppress("DEPRECATION")
     override suspend fun loadLinks(
         data: String, 
         isCasting: Boolean, 
@@ -101,13 +100,15 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // Usiamo il costruttore completo con parametri nominati per evitare errori di posizione
+            // UTILIZZO CORRETTO DI newExtractorLink SECONDO LE NUOVE API
+            // Invece di passare referer come stringa posizionale, 
+            // lo inseriamo nella mappa degli headers.
             callback.invoke(
-                ExtractorLink(
-                    source = name,
-                    name = name,
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
                     url = m3u8Url,
-                    referer = data,
+                    referer = data, // Usiamo il parametro nominato referer che la funzione helper mappa internamente
                     quality = Qualities.Unknown.value,
                     isM3u8 = true
                 )
