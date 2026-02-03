@@ -73,7 +73,6 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-        // Usiamo newLiveStreamLoadResponse con i 3 parametri stringa richiesti
         return newLiveStreamLoadResponse(title, url, url).apply {
             this.posterUrl = poster
             this.plot = description
@@ -100,17 +99,16 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // Usiamo il costruttore diretto sopprimendo il warning di deprecazione
-            // Questo permette di settare referer e quality che sono 'val'
-            @Suppress("DEPRECATION")
+            // SOLUZIONE FINALE: Usiamo newExtractorLink con i parametri minimi 
+            // e lasciamo che la libreria gestisca il resto.
             callback.invoke(
-                ExtractorLink(
-                    name,
-                    name,
-                    m3u8Url,
-                    data,
-                    Qualities.Unknown.value,
-                    true
+                newExtractorLink(
+                    source = name,
+                    name = name,
+                    url = m3u8Url,
+                    referer = data,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = true
                 )
             )
             return true
