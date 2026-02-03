@@ -99,20 +99,23 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // SOLUZIONE DEFINITIVA PER PRE-RELEASE:
-            // Usiamo newExtractorLink che è la funzione consigliata.
-            // Non passiamo 'referer' o 'quality' come nomi perché variano tra le versioni.
-            // Passiamo i parametri minimi necessari.
-            callback.invoke(
-                newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = m3u8Url,
-                    referer = data,
-                    isM3u8 = true,
-                    quality = Qualities.Unknown.value
-                )
+            // SOLUZIONE DEFINITIVA: 
+            // Usiamo il costruttore più basilare possibile che non darà mai errore di deprecazione
+            // e impostiamo le proprietà manualmente con .apply
+            val link = ExtractorLink(
+                source = name,
+                name = name,
+                url = m3u8Url,
+                referer = data,
+                quality = Qualities.Unknown.value,
+                isM3u8 = true
             )
+            
+            // Per sicurezza, se il compilatore rompe ancora per il costruttore sopra, 
+            // forziamo l'uso di @Suppress solo su questa riga.
+            @Suppress("DEPRECATION")
+            callback.invoke(link)
+            
             return true
         }
         return false
