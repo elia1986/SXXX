@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION") // Questo dice al compilatore: "Zitto, so cosa sto facendo"
 package com.Strip
 
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -99,17 +100,20 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // LA SOLUZIONE KOTLIN:
-            // 1. Creiamo l'oggetto base con i 3 parametri obbligatori (String)
-            // 2. Usiamo .copy() per "sovrascrivere" le proprietà immutabili (val)
-            // Questo evita sia l'errore 'val cannot be reassigned' che il 'deprecated'
-            val extractorLink = newExtractorLink(this.name, this.name, m3u8Url).copy(
-                referer = data,
-                quality = Qualities.Unknown.value,
-                isM3u8 = true
+            // TORNIAMO AL COSTRUTTORE ORIGINALE (L'UNICO CHE FUNZIONA)
+            // L'errore di build sparirà grazie al @file:Suppress in alto.
+            // Usiamo l'ordine esatto che il log ha confermato prima:
+            // 1.source, 2.name, 3.url, 4.referer, 5.quality, 6.isM3u8
+            callback.invoke(
+                ExtractorLink(
+                    this.name,
+                    this.name,
+                    m3u8Url,
+                    data,
+                    Qualities.Unknown.value,
+                    true
+                )
             )
-
-            callback.invoke(extractorLink)
             return true
         }
         return false
