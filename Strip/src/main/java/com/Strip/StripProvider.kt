@@ -73,7 +73,7 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-        // CORREZIONE: rimosso TvType.Live dai parametri obbligatori
+        // Usiamo newLiveStreamLoadResponse con i 3 parametri stringa richiesti
         return newLiveStreamLoadResponse(title, url, url).apply {
             this.posterUrl = poster
             this.plot = description
@@ -100,18 +100,18 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // CORREZIONE: usati solo i 3 parametri richiesti (source, name, url)
-            // e spostati gli altri all'interno del blocco initializer
+            // Usiamo il costruttore diretto sopprimendo il warning di deprecazione
+            // Questo permette di settare referer e quality che sono 'val'
+            @Suppress("DEPRECATION")
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     name,
                     name,
                     m3u8Url,
-                ).apply {
-                    this.referer = data
-                    this.quality = Qualities.Unknown.value
-                    this.isM3u8 = true
-                }
+                    data,
+                    Qualities.Unknown.value,
+                    true
+                )
             )
             return true
         }
