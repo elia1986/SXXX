@@ -6,133 +6,146 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class StripProvider : MainAPI() {
-    override var mainUrl              = "https://stripchat.com"
-    override var name                 = "Strip"
-    override val hasMainPage          = true
-    override var lang                 = "en"
-    override val hasDownloadSupport   = true
+    // Passiamo a xhamsterlive
+    override var mainUrl = "https://xhamsterlive.com"
+    override var name = "Strip"
+    override val hasMainPage = true
+    override var lang = "en"
+    override val hasDownloadSupport = true
     override val hasChromecastSupport = true
-    override val supportedTypes       = setOf(TvType.NSFW)
-    override val vpnStatus            = VPNStatus.MightBeNeeded
-    private val apiUrl = "$mainUrl/api/front/models/get-list"
-    private val excludeIdsMap : MutableMap<String,MutableList<Int>> = mutableMapOf()
+    override val supportedTypes = setOf(TvType.NSFW)
+    override val vpnStatus = VPNStatus.MightBeNeeded
+
+    // Parametri per l'API v2 di XHamsterLive
+    private val apiParams = "limit=60&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
     override val mainPage = mainPageOf(
-            "girls" to "Girls",
-            "couples" to "Couples",
-            "men" to "Men",
-            "trans" to "Trans",
-        )
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-            val map = mapOf(
-                "favoriteIds" to mutableListOf<String>(),
-                "limit" to 60,
-                "offset" to 0,
-                "primaryTag" to request.data,
-                "sortBy" to "viewersRating",
-                "userRole" to "guest",
-                "improveTs" to false,
-                "excludeModelIds" to (excludeIdsMap[request.data] ?: mutableListOf<Int>()),
-                "isRecommendationDisabled" to false,)
-            val eList : MutableList<Int> = mutableListOf<Int>()
-            val responseList = app.post(apiUrl, json = map).parsedSafe<Response>()!!.models.map { model->
-                eList.add(model.id.toInt())
-                LiveSearchResponse(
-                    name      = model.username,
-                    url       = "$mainUrl/${model.username}",
-                    apiName   = this@StripchatProvider.name,
-                    type      = TvType.Live,
-                    posterUrl = model.previewUrlThumbSmall,
-                    lang      = null
-                )
-            }
-            if(excludeIdsMap[request.data].isNullOrEmpty())
-            {
-                excludeIdsMap[request.data] = mutableListOf<Int>()
-                excludeIdsMap[request.data]?.addAll(eList)
-            }
-            else
-            {
-                excludeIdsMap[request.data]?.addAll(eList)
-            }
-            return newHomePageResponse(HomePageList(request.name, responseList, isHorizontalImages = true),hasNext = true)
+        "girls" to "Girls",
+        "couples" to "Couples",
+        "men" to "Men",
+        "trans" to "Trans",
+    )
 
+    private fun getHeaders() = mapOf(
+        "X-Requested-With" to "XMLHttpRequest",
+        "Referer" to "$mainUrl/",
+        "Accept" to "application/json"
+    )
+
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val offset = (page - 1) * 60
+        // XHamsterLive usa GET invece di POST per la lista modelli
+        val url = "$mainUrl/api/front/v2/models?primaryTag=${request.data}&offset=$offset&$apiParams"
+        
+        val response = app.get(url, headers = getHeaders()).parsedSafe<Response>()
+        
+        val responseList = response?.models?.map { model ->
+            LiveSearchResponse(
+                name = model.username ?: "Unknown",
+                url = "$mainUrl/${model.username}",
+                apiName = this@StripProvider.name,
+                type = TvType.Live,
+                posterUrl = model.previewUrl ?: model.thumbUrl ?: "https://img.doppiocdn.net/${model.preview?.url?.trimStart('/')}",
+                lang = null
+            )
+        } ?: emptyList()
+
+        return newHomePageResponse(
+            HomePageList(request.name, responseList, isHorizontalImages = true),
+            hasNext = responseList.isNotEmpty()
+        )
     }
 
     private fun Element.toSearchResult(): SearchResponse {
         val title = this.select(".model-list-item-username").text()
-        val href = mainUrl + this.select(".model-list-item-link").attr("href")
+        val href = this.select(".model-list-item-link").attr("href").let { 
+            if (it.startsWith("http")) it else mainUrl + it 
+        }
         val posterUrl = this.selectFirst(".image-background")?.attr("src")
+        
         return LiveSearchResponse(
-            name      = title,
-            url       = href,
-            apiName   = this@StripchatProvider.name,
-            type      = TvType.Live,
+            name = title,
+            url = href,
+            apiName = this@StripProvider.name,
+            type = TvType.Live,
             posterUrl = posterUrl,
-            lang      = null
+            lang = null
         )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val headers = mutableMapOf(
-            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
-        )
-        val doc = app.get("$mainUrl/search/models/$query",headers = headers).document
+        // La ricerca su XHamsterLive segue lo stesso schema di Strip
+        val doc = app.get("$mainUrl/search/models/$query", headers = getHeaders()).document
         return doc.select(".model-list-item").map { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val headers = mutableMapOf(
-            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
-        )
-        val document = app.get(url,headers = headers).document
-        val title = document.selectFirst("meta[property=og:title]")?.attr("content")?.trim().toString().replace("| PornHoarder.tv","")
-        val poster = fixUrlNull(document.selectFirst("[property='og:image']")?.attr("content"))
-        val description = document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
-    
+        val document = app.get(url, headers = getHeaders()).document
+        val title = document.selectFirst("meta[property='og:title']")?.attr("content")?.replace(" | XHamsterLive", "")
+        val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
+        val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-         return LiveStreamLoadResponse(
-            name      = title,
-            url       = url,
-            apiName   = this.name,
-            dataUrl   = url,
+        return LiveStreamLoadResponse(
+            name = title ?: "Live Show",
+            url = url,
+            apiName = this.name,
+            dataUrl = url,
             posterUrl = poster,
-            plot      = description,
+            plot = description,
         )
     }
 
-    override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
+    override suspend fun loadLinks(
+        data: String, 
+        isCasting: Boolean, 
+        subtitleCallback: (SubtitleFile) -> Unit, 
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
         val doc = app.get(data).document
-        val script = doc.select("script").find { item-> item.html().contains("window.__PRELOADED_STATE__") }
-        val json = script!!.html().unescapeUnicode()
+        val script = doc.select("script").find { it.html().contains("window.__PRELOADED_STATE__") }
+            ?: return false
+            
+        val json = script.html().unescapeUnicode()
+        
+        // Estrazione dati stream per XHamsterLive
         val streamName = json.substringAfter("\"streamName\":\"").substringBefore("\",")
         val streamHost = json.substringAfter("\"hlsStreamHost\":\"").substringBefore("\",")
         val hlsUrlTemplate = json.substringAfter("\"hlsStreamUrlTemplate\":\"").substringBefore("\",")
-        val finalm3u8Url = hlsUrlTemplate.replace("{cdnHost}",streamHost).replace("{streamName}",streamName).replace("{suffix}","_auto")
-        callback.invoke(
-            ExtractorLink(
-                source = name,
-                name = name,
-                url = finalm3u8Url,
-                referer = "",
-                Qualities.Unknown.value,
-                isM3u8 = true
-            )
-        )
+        
+        if (streamName.isNotBlank() && streamHost.isNotBlank()) {
+            val finalm3u8Url = hlsUrlTemplate
+                .replace("{cdnHost}", streamHost)
+                .replace("{streamName}", streamName)
+                .replace("{suffix}", "_auto")
 
-        return true
+            callback.invoke(
+                ExtractorLink(
+                    source = name,
+                    name = name,
+                    url = finalm3u8Url,
+                    referer = data,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = true
+                )
+            )
+            return true
+        }
+        return false
     }
 
-    data class Model(
-        @JsonProperty("hlsPlaylist")    val hlsPlaylist: String       = "",
-        @JsonProperty("id")  val id: String  = "",
-        @JsonProperty("previewUrlThumbSmall")  val previewUrlThumbSmall: String  = "",
-        @JsonProperty("username")  val username: String  = ""
+    // Classi di supporto aggiornate per i nuovi nomi dei campi JSON
+    data class Preview(@JsonProperty("url") val url: String? = null)
 
+    data class Model(
+        @JsonProperty("id") val id: String? = null,
+        @JsonProperty("username") val username: String? = null,
+        @JsonProperty("previewUrl") val previewUrl: String? = null,
+        @JsonProperty("thumbUrl") val thumbUrl: String? = null,
+        @JsonProperty("preview") val preview: Preview? = null
     )
 
     data class Response(
-        @JsonProperty("models")  val models: List<Model> = arrayListOf()
+        @JsonProperty("models") val models: List<Model> = arrayListOf()
     )
 }
 
