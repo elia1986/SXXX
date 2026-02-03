@@ -99,17 +99,18 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // Questa è la sintassi minima universale che DEVE passare.
-            // Passiamo solo i 3 parametri obbligatori (name, source, url)
-            // Tutto il resto lo mettiamo dentro headers o lasciamo i default.
+            // SOLUZIONE DEFINITIVA PER PRE-RELEASE:
+            // Usiamo newExtractorLink che è la funzione consigliata.
+            // Non passiamo 'referer' o 'quality' come nomi perché variano tra le versioni.
+            // Passiamo i parametri minimi necessari.
             callback.invoke(
-                ExtractorLink(
-                    name,
-                    name,
-                    m3u8Url,
-                    data, // Questo è il referer in molte versioni (il 4° parametro stringa)
-                    Qualities.P1080.value, // Usiamo un intero diretto
-                    true
+                newExtractorLink(
+                    source = name,
+                    name = name,
+                    url = m3u8Url,
+                    referer = data,
+                    isM3u8 = true,
+                    quality = Qualities.Unknown.value
                 )
             )
             return true
