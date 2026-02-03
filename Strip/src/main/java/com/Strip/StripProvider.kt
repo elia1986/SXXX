@@ -147,15 +147,15 @@ class StripProvider : MainAPI() {
                 .replace("\\u002F", "/")
 
         callback.invoke(
-            ExtractorLink(
-                name,
-                name,
-                m3u8,
-                data,
-                Qualities.Unknown.value,
-                true
-            )
-        )
+    newExtractorLink(
+        name,
+        name,
+        m3u8,
+        data,
+        Qualities.Unknown.value,
+        true
+    )
+)
 
         return true
     }
