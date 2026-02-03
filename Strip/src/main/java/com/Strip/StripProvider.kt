@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class StripProvider : MainAPI() {
-    // Passiamo a xhamsterlive
     override var mainUrl = "https://xhamsterlive.com"
     override var name = "Strip"
     override val hasMainPage = true
@@ -16,7 +15,6 @@ class StripProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.NSFW)
     override val vpnStatus = VPNStatus.MightBeNeeded
 
-    // Parametri per l'API v2 di XHamsterLive
     private val apiParams = "limit=60&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
     override val mainPage = mainPageOf(
@@ -34,20 +32,18 @@ class StripProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val offset = (page - 1) * 60
-        // XHamsterLive usa GET invece di POST per la lista modelli
         val url = "$mainUrl/api/front/v2/models?primaryTag=${request.data}&offset=$offset&$apiParams"
         
         val response = app.get(url, headers = getHeaders()).parsedSafe<Response>()
         
         val responseList = response?.models?.map { model ->
-            LiveSearchResponse(
+            newLiveSearchResponse(
                 name = model.username ?: "Unknown",
                 url = "$mainUrl/${model.username}",
-                apiName = this@StripProvider.name,
                 type = TvType.Live,
-                posterUrl = model.previewUrl ?: model.thumbUrl ?: "https://img.doppiocdn.net/${model.preview?.url?.trimStart('/')}",
-                lang = null
-            )
+            ).apply {
+                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: "https://img.doppiocdn.net/${model.preview?.url?.trimStart('/')}"
+            }
         } ?: emptyList()
 
         return newHomePageResponse(
@@ -63,18 +59,16 @@ class StripProvider : MainAPI() {
         }
         val posterUrl = this.selectFirst(".image-background")?.attr("src")
         
-        return LiveSearchResponse(
+        return newLiveSearchResponse(
             name = title,
             url = href,
-            apiName = this@StripProvider.name,
             type = TvType.Live,
-            posterUrl = posterUrl,
-            lang = null
-        )
+        ).apply {
+            this.posterUrl = posterUrl
+        }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // La ricerca su XHamsterLive segue lo stesso schema di Strip
         val doc = app.get("$mainUrl/search/models/$query", headers = getHeaders()).document
         return doc.select(".model-list-item").map { it.toSearchResult() }
     }
@@ -85,14 +79,14 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-        return LiveStreamLoadResponse(
+        return newLiveStreamLoadResponse(
             name = title ?: "Live Show",
             url = url,
-            apiName = this.name,
             dataUrl = url,
-            posterUrl = poster,
-            plot = description,
-        )
+        ).apply {
+            this.posterUrl = poster
+            this.plot = description
+        }
     }
 
     override suspend fun loadLinks(
@@ -107,7 +101,6 @@ class StripProvider : MainAPI() {
             
         val json = script.html().unescapeUnicode()
         
-        // Estrazione dati stream per XHamsterLive
         val streamName = json.substringAfter("\"streamName\":\"").substringBefore("\",")
         val streamHost = json.substringAfter("\"hlsStreamHost\":\"").substringBefore("\",")
         val hlsUrlTemplate = json.substringAfter("\"hlsStreamUrlTemplate\":\"").substringBefore("\",")
@@ -119,7 +112,7 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
 
             callback.invoke(
-                ExtractorLink(
+                newExtractorLink(
                     source = name,
                     name = name,
                     url = finalm3u8Url,
@@ -133,7 +126,6 @@ class StripProvider : MainAPI() {
         return false
     }
 
-    // Classi di supporto aggiornate per i nuovi nomi dei campi JSON
     data class Preview(@JsonProperty("url") val url: String? = null)
 
     data class Model(
