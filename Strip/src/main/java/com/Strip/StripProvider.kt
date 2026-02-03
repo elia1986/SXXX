@@ -3,7 +3,6 @@ package com.Strip
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 
 class StripProvider : MainAPI() {
     override var mainUrl = "https://xhamsterlive.com"
@@ -100,17 +99,17 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // UTILIZZO CORRETTO DI newExtractorLink SECONDO LE NUOVE API
-            // Invece di passare referer come stringa posizionale, 
-            // lo inseriamo nella mappa degli headers.
+            // Questa è la sintassi minima universale che DEVE passare.
+            // Passiamo solo i 3 parametri obbligatori (name, source, url)
+            // Tutto il resto lo mettiamo dentro headers o lasciamo i default.
             callback.invoke(
-                newExtractorLink(
-                    source = this.name,
-                    name = this.name,
-                    url = m3u8Url,
-                    referer = data, // Usiamo il parametro nominato referer che la funzione helper mappa internamente
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true
+                ExtractorLink(
+                    name,
+                    name,
+                    m3u8Url,
+                    data, // Questo è il referer in molte versioni (il 4° parametro stringa)
+                    Qualities.P1080.value, // Usiamo un intero diretto
+                    true
                 )
             )
             return true
