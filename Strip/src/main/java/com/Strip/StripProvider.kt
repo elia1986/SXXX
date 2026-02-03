@@ -1,9 +1,9 @@
 package com.Strip
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 
 class StripProvider : MainAPI() {
     override var mainUrl = "https://xhamsterlive.com"
@@ -15,34 +15,37 @@ class StripProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.NSFW)
     override val vpnStatus = VPNStatus.MightBeNeeded
 
+    // Parametri estratti dalla logica di RikaCelery
     private val apiParams = "limit=60&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
     override val mainPage = mainPageOf(
         "girls" to "Girls",
         "couples" to "Couples",
-        "men" to "Men",
         "trans" to "Trans",
-    )
-
-    private fun getHeaders() = mapOf(
-        "X-Requested-With" to "XMLHttpRequest",
-        "Referer" to "$mainUrl/",
-        "Accept" to "application/json"
+        "men" to "Men",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val offset = (page - 1) * 60
         val url = "$mainUrl/api/front/v2/models?primaryTag=${request.data}&offset=$offset&$apiParams"
         
-        val response = app.get(url, headers = getHeaders()).parsedSafe<Response>()
-        
+        // Header più completi per simulare un browser reale
+        val res = app.get(url, headers = mapOf(
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to "$mainUrl/",
+            "Accept" to "application/json"
+        ))
+
+        val response = res.parsedSafe<StripResponse>()
         val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
                 model.username ?: "Unknown",
                 "$mainUrl/${model.username}",
                 TvType.Live,
             ).apply {
-                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: "https://img.doppiocdn.net/${model.preview?.url?.trimStart('/')}"
+                // Logica posterUrl corretta per XHamsterLive
+                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: 
+                                 (model.preview?.url?.let { if (it.startsWith("http")) it else "https://img.doppiocdn.net/${it.trimStart('/')}" })
             }
         } ?: emptyList()
 
@@ -52,35 +55,29 @@ class StripProvider : MainAPI() {
         )
     }
 
-    private fun Element.toSearchResult(): SearchResponse {
-        val title = this.select(".model-list-item-username").text()
-        val href = this.select(".model-list-item-link").attr("href").let { 
-            if (it.startsWith("http")) it else mainUrl + it 
-        }
-        val posterUrl = this.selectFirst(".image-background")?.attr("src")
-        
-        return newLiveSearchResponse(title, href, TvType.Live).apply {
-            this.posterUrl = posterUrl
-        }
-    }
-
     override suspend fun search(query: String): List<SearchResponse> {
-        val doc = app.get("$mainUrl/search/models/$query", headers = getHeaders()).document
-        return doc.select(".model-list-item").map { it.toSearchResult() }
+        val url = "$mainUrl/api/front/v2/models?queryString=$query&$apiParams"
+        val res = app.get(url)
+        val response = res.parsedSafe<StripResponse>()
+        
+        return response?.models?.map { model ->
+            newLiveSearchResponse(
+                model.username ?: "Unknown",
+                "$mainUrl/${model.username}",
+                TvType.Live,
+            ).apply {
+                this.posterUrl = model.previewUrl ?: model.thumbUrl
+            }
+        } ?: emptyList()
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url, headers = getHeaders()).document
-        val title = document.selectFirst("meta[property='og:title']")?.attr("content")?.replace(" | XHamsterLive", "")
+        val document = app.get(url).document
+        val title = document.selectFirst("meta[property='og:title']")?.attr("content")?.replace(" | XHamsterLive", "") ?: "Live Show"
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-        return newLiveStreamLoadResponse(
-            title ?: "Live Show",
-            url,
-            TvType.Live,
-            url,
-        ).apply {
+        return newLiveStreamLoadResponse(title, url, TvType.Live, url).apply {
             this.posterUrl = poster
             this.plot = description
         }
@@ -92,28 +89,26 @@ class StripProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit, 
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val doc = app.get(data).document
-        val script = doc.select("script").find { it.html().contains("window.__PRELOADED_STATE__") }
-            ?: return false
-            
-        val json = script.html().unescapeUnicode()
+        val res = app.get(data)
+        val html = res.text
         
-        val streamName = json.substringAfter("\"streamName\":\"").substringBefore("\",")
-        val streamHost = json.substringAfter("\"hlsStreamHost\":\"").substringBefore("\",")
-        val hlsUrlTemplate = json.substringAfter("\"hlsStreamUrlTemplate\":\"").substringBefore("\",")
+        // Estrazione precisa dei dati HLS come in XhRec
+        val streamName = html.substringAfter("\"streamName\":\"").substringBefore("\"")
+        val streamHost = html.substringAfter("\"hlsStreamHost\":\"").substringBefore("\"")
+        val urlTemplate = html.substringAfter("\"hlsStreamUrlTemplate\":\"").substringBefore("\"")
         
         if (streamName.isNotBlank() && streamHost.isNotBlank()) {
-            val finalm3u8Url = hlsUrlTemplate
+            val m3u8Url = urlTemplate
                 .replace("{cdnHost}", streamHost)
                 .replace("{streamName}", streamName)
                 .replace("{suffix}", "_auto")
+                .replace("\\u002F", "/")
 
-            // Usiamo il metodo posizionale per evitare errori di nomi parametri
             callback.invoke(
                 newExtractorLink(
                     name,
                     name,
-                    finalm3u8Url,
+                    m3u8Url,
                     data,
                     Qualities.Unknown.value,
                     true
@@ -124,21 +119,17 @@ class StripProvider : MainAPI() {
         return false
     }
 
+    // Strutture dati allineate all'API di XHamsterLive
     data class Preview(@JsonProperty("url") val url: String? = null)
 
     data class Model(
-        @JsonProperty("id") val id: String? = null,
         @JsonProperty("username") val username: String? = null,
         @JsonProperty("previewUrl") val previewUrl: String? = null,
         @JsonProperty("thumbUrl") val thumbUrl: String? = null,
-        @JsonProperty("preview") val preview: Preview? = null
+        @JsonProperty("preview") val preview: Preview? = null,
     )
 
-    data class Response(
-        @JsonProperty("models") val models: List<Model> = arrayListOf()
+    data class StripResponse(
+        @JsonProperty("models") val models: List<Model>? = null
     )
-}
-
-fun String.unescapeUnicode() = replace("\\\\u([0-9A-Fa-f]{4})".toRegex()) {
-    String(Character.toChars(it.groupValues[1].toInt(radix = 16)))
 }
