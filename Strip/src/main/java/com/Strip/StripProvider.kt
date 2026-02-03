@@ -38,9 +38,9 @@ class StripProvider : MainAPI() {
         
         val responseList = response?.models?.map { model ->
             newLiveSearchResponse(
-                name = model.username ?: "Unknown",
-                url = "$mainUrl/${model.username}",
-                type = TvType.Live,
+                model.username ?: "Unknown",
+                "$mainUrl/${model.username}",
+                TvType.Live,
             ).apply {
                 this.posterUrl = model.previewUrl ?: model.thumbUrl ?: "https://img.doppiocdn.net/${model.preview?.url?.trimStart('/')}"
             }
@@ -59,11 +59,7 @@ class StripProvider : MainAPI() {
         }
         val posterUrl = this.selectFirst(".image-background")?.attr("src")
         
-        return newLiveSearchResponse(
-            name = title,
-            url = href,
-            type = TvType.Live,
-        ).apply {
+        return newLiveSearchResponse(title, href, TvType.Live).apply {
             this.posterUrl = posterUrl
         }
     }
@@ -80,9 +76,10 @@ class StripProvider : MainAPI() {
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
         return newLiveStreamLoadResponse(
-            name = title ?: "Live Show",
-            url = url,
-            dataUrl = url,
+            title ?: "Live Show",
+            url,
+            TvType.Live,
+            url,
         ).apply {
             this.posterUrl = poster
             this.plot = description
@@ -111,14 +108,15 @@ class StripProvider : MainAPI() {
                 .replace("{streamName}", streamName)
                 .replace("{suffix}", "_auto")
 
+            // Usiamo il metodo posizionale per evitare errori di nomi parametri
             callback.invoke(
                 newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = finalm3u8Url,
-                    referer = data,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true
+                    name,
+                    name,
+                    finalm3u8Url,
+                    data,
+                    Qualities.Unknown.value,
+                    true
                 )
             )
             return true
