@@ -73,6 +73,7 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
+        // Il terzo parametro deve essere una String (dataUrl)
         return newLiveStreamLoadResponse(title, url, url).apply {
             this.posterUrl = poster
             this.plot = description
@@ -99,15 +100,19 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // UTILIZZO DELLA FIRMA CORRETTA:
-            // source, name, url, type (opzionale), initializer (blocco lambda)
+            // UTILIZZO DELLA FIRMA ESATTA RICHIESTA DAL TUO COMPILATORE:
+            // 1. source: String
+            // 2. name: String
+            // 3. url: String
+            // 4. type: ExtractorLinkType? (mettiamo null per usare il default)
+            // 5. initializer: Blocco Lambda ( { ... } )
             callback.invoke(
                 newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = m3u8Url
+                    this.name, 
+                    this.name, 
+                    m3u8Url, 
+                    null
                 ) {
-                    // Qui dentro impostiamo i campi che il compilatore non vuole più fuori
                     this.referer = data
                     this.quality = Qualities.Unknown.value
                     this.isM3u8 = true
