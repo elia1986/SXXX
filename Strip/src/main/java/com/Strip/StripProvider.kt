@@ -73,12 +73,14 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
+        // In pre-release, il terzo parametro DEVE essere una String (dataUrl)
         return newLiveStreamLoadResponse(title, url, url).apply {
             this.posterUrl = poster
             this.plot = description
         }
     }
 
+    @Suppress("DEPRECATION")
     override suspend fun loadLinks(
         data: String, 
         isCasting: Boolean, 
@@ -99,10 +101,9 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
-            // SOLUZIONE FINALE: Usiamo newExtractorLink con i parametri minimi 
-            // e lasciamo che la libreria gestisca il resto.
+            // Usiamo il costruttore completo con parametri nominati per evitare errori di posizione
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     source = name,
                     name = name,
                     url = m3u8Url,
