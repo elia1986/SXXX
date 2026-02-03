@@ -3,7 +3,6 @@ package com.Strip
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 
 class StripProvider : MainAPI() {
     override var mainUrl = "https://xhamsterlive.com"
@@ -15,7 +14,6 @@ class StripProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.NSFW)
     override val vpnStatus = VPNStatus.MightBeNeeded
 
-    // Parametri estratti dalla logica di RikaCelery
     private val apiParams = "limit=60&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
     override val mainPage = mainPageOf(
@@ -29,7 +27,6 @@ class StripProvider : MainAPI() {
         val offset = (page - 1) * 60
         val url = "$mainUrl/api/front/v2/models?primaryTag=${request.data}&offset=$offset&$apiParams"
         
-        // Header più completi per simulare un browser reale
         val res = app.get(url, headers = mapOf(
             "X-Requested-With" to "XMLHttpRequest",
             "Referer" to "$mainUrl/",
@@ -43,7 +40,6 @@ class StripProvider : MainAPI() {
                 "$mainUrl/${model.username}",
                 TvType.Live,
             ).apply {
-                // Logica posterUrl corretta per XHamsterLive
                 this.posterUrl = model.previewUrl ?: model.thumbUrl ?: 
                                  (model.preview?.url?.let { if (it.startsWith("http")) it else "https://img.doppiocdn.net/${it.trimStart('/')}" })
             }
@@ -77,7 +73,8 @@ class StripProvider : MainAPI() {
         val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
         val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-        return newLiveStreamLoadResponse(title, url, TvType.Live, url).apply {
+        // CORREZIONE: rimosso TvType.Live dai parametri obbligatori
+        return newLiveStreamLoadResponse(title, url, url).apply {
             this.posterUrl = poster
             this.plot = description
         }
@@ -92,7 +89,6 @@ class StripProvider : MainAPI() {
         val res = app.get(data)
         val html = res.text
         
-        // Estrazione precisa dei dati HLS come in XhRec
         val streamName = html.substringAfter("\"streamName\":\"").substringBefore("\"")
         val streamHost = html.substringAfter("\"hlsStreamHost\":\"").substringBefore("\"")
         val urlTemplate = html.substringAfter("\"hlsStreamUrlTemplate\":\"").substringBefore("\"")
@@ -104,22 +100,24 @@ class StripProvider : MainAPI() {
                 .replace("{suffix}", "_auto")
                 .replace("\\u002F", "/")
 
+            // CORREZIONE: usati solo i 3 parametri richiesti (source, name, url)
+            // e spostati gli altri all'interno del blocco initializer
             callback.invoke(
                 newExtractorLink(
                     name,
                     name,
                     m3u8Url,
-                    data,
-                    Qualities.Unknown.value,
-                    true
-                )
+                ).apply {
+                    this.referer = data
+                    this.quality = Qualities.Unknown.value
+                    this.isM3u8 = true
+                }
             )
             return true
         }
         return false
     }
 
-    // Strutture dati allineate all'API di XHamsterLive
     data class Preview(@JsonProperty("url") val url: String? = null)
 
     data class Model(
