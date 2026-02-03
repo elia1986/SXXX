@@ -1,61 +1,133 @@
-1m 57s
-Run chmod +x gradlew && ./gradlew make
-Downloading https://services.gradle.org/distributions/gradle-8.12-bin.zip
-..................................................................................................................................
-Unzipping /home/runner/.gradle/wrapper/dists/gradle-8.12-bin/cetblhg4pflnnks72fxwobvgv/gradle-8.12-bin.zip to /home/runner/.gradle/wrapper/dists/gradle-8.12-bin/cetblhg4pflnnks72fxwobvgv
-Set executable permissions for: /home/runner/.gradle/wrapper/dists/gradle-8.12-bin/cetblhg4pflnnks72fxwobvgv/gradle-8.12/bin/gradle
+package com.Strip
 
-Welcome to Gradle 8.12!
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 
-Here are the highlights of this release:
- - Enhanced error and warning reporting with the Problems API
- - File-system watching support on Alpine Linux
- - Build and test Swift 6 libraries and apps
+class StripProvider : MainAPI() {
+    override var mainUrl = "https://xhamsterlive.com"
+    override var name = "Strip"
+    override val hasMainPage = true
+    override var lang = "en"
+    override val hasDownloadSupport = true
+    override val hasChromecastSupport = true
+    override val supportedTypes = setOf(TvType.NSFW)
+    override val vpnStatus = VPNStatus.MightBeNeeded
 
-For more details see https://docs.gradle.org/8.12/release-notes.html
+    private val apiParams = "limit=60&isRevised=true&nic=true&guestHash=a1ba5b85cbcd82cb9c6be570ddfa8a266f6461a38d55b89ea1a5fb06f0790f60"
 
-Starting a Gradle Daemon (subsequent builds will be faster)
+    override val mainPage = mainPageOf(
+        "girls" to "Girls",
+        "couples" to "Couples",
+        "trans" to "Trans",
+        "men" to "Men",
+    )
 
-> Configure project :Chaturbate
-Fetching JAR
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val offset = (page - 1) * 60
+        val url = "$mainUrl/api/front/v2/models?primaryTag=${request.data}&offset=$offset&$apiParams"
+        
+        val res = app.get(url, headers = mapOf(
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to "$mainUrl/",
+            "Accept" to "application/json"
+        ))
 
-> Task :Chaturbate:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :Chaturbate:preBuild UP-TO-DATE
-> Task :Chaturbate:preDebugBuild UP-TO-DATE
-> Task :Chaturbate:generateDebugResValues
-> Task :Chaturbate:generateDebugResources
-> Task :Chaturbate:packageDebugResources
-> Task :Strip:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :Strip:preBuild UP-TO-DATE
-> Task :Strip:preDebugBuild UP-TO-DATE
-> Task :Strip:generateDebugResValues
-> Task :Strip:generateDebugResources
-> Task :Strip:packageDebugResources
-> Task :Chaturbate:parseDebugLocalResources
-> Task :Strip:parseDebugLocalResources
-> Task :Strip:generateDebugRFile
-> Task :Chaturbate:generateDebugRFile
-e: file:///home/runner/work/SXXX/SXXX/Strip/src/main/java/com/Strip/StripProvider.kt:154:9 Argument type mismatch: actual type is 'kotlin.String', but 'com.lagradost.cloudstream3.utils.ExtractorLinkType?' was expected.
-e: file:///home/runner/work/SXXX/SXXX/Strip/src/main/java/com/Strip/StripProvider.kt:155:9 Argument type mismatch: actual type is 'kotlin.Int', but 'kotlin.coroutines.SuspendFunction1<com.lagradost.cloudstream3.utils.ExtractorLink, kotlin.Unit>' was expected.
-e: file:///home/runner/work/SXXX/SXXX/Strip/src/main/java/com/Strip/StripProvider.kt:156:9 Too many arguments for 'suspend fun newExtractorLink(source: String, name: String, url: String, type: ExtractorLinkType? = ..., initializer: suspend ExtractorLink.() -> Unit = ...): ExtractorLink'.
+        val response = res.parsedSafe<StripResponse>()
+        val responseList = response?.models?.map { model ->
+            newLiveSearchResponse(
+                model.username ?: "Unknown",
+                "$mainUrl/${model.username}",
+                TvType.Live,
+            ).apply {
+                this.posterUrl = model.previewUrl ?: model.thumbUrl ?: 
+                                 (model.preview?.url?.let { if (it.startsWith("http")) it else "https://img.doppiocdn.net/${it.trimStart('/')}" })
+            }
+        } ?: emptyList()
 
-> Task :Strip:compileDebugKotlin FAILED
+        return newHomePageResponse(
+            HomePageList(request.name, responseList, isHorizontalImages = true),
+            hasNext = responseList.isNotEmpty()
+        )
+    }
 
-> Task :Chaturbate:compileDebugKotlin
+    override suspend fun search(query: String): List<SearchResponse> {
+        val url = "$mainUrl/api/front/v2/models?queryString=$query&$apiParams"
+        val res = app.get(url)
+        val response = res.parsedSafe<StripResponse>()
+        
+        return response?.models?.map { model ->
+            newLiveSearchResponse(
+                model.username ?: "Unknown",
+                "$mainUrl/${model.username}",
+                TvType.Live,
+            ).apply {
+                this.posterUrl = model.previewUrl ?: model.thumbUrl
+            }
+        } ?: emptyList()
+    }
 
-FAILURE: Build failed with an exception.
+    override suspend fun load(url: String): LoadResponse {
+        val document = app.get(url).document
+        val title = document.selectFirst("meta[property='og:title']")?.attr("content")?.replace(" | XHamsterLive", "") ?: "Live Show"
+        val poster = document.selectFirst("meta[property='og:image']")?.attr("content")
+        val description = document.selectFirst("meta[property='og:description']")?.attr("content")
 
-* What went wrong:
-Execution failed for task ':Strip:compileDebugKotlin'.
-> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
-   > Compilation error. See log for more details
+        return newLiveStreamLoadResponse(title, url, url).apply {
+            this.posterUrl = poster
+            this.plot = description
+        }
+    }
 
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights.
-12 actionable tasks: 12 executed
-> Get more help at https://help.gradle.org.
+    override suspend fun loadLinks(
+        data: String, 
+        isCasting: Boolean, 
+        subtitleCallback: (SubtitleFile) -> Unit, 
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val res = app.get(data)
+        val html = res.text
+        
+        val streamName = html.substringAfter("\"streamName\":\"").substringBefore("\"")
+        val streamHost = html.substringAfter("\"hlsStreamHost\":\"").substringBefore("\"")
+        val urlTemplate = html.substringAfter("\"hlsStreamUrlTemplate\":\"").substringBefore("\"")
+        
+        if (streamName.isNotBlank() && streamHost.isNotBlank()) {
+            val m3u8Url = urlTemplate
+                .replace("{cdnHost}", streamHost)
+                .replace("{streamName}", streamName)
+                .replace("{suffix}", "_auto")
+                .replace("\\u002F", "/")
 
-BUILD FAILED in 1m 56s
-Error: Process completed with exit code 1.
+            // UTILIZZO DELLA FIRMA CORRETTA:
+            // source, name, url, type (opzionale), initializer (blocco lambda)
+            callback.invoke(
+                newExtractorLink(
+                    source = name,
+                    name = name,
+                    url = m3u8Url
+                ) {
+                    // Qui dentro impostiamo i campi che il compilatore non vuole più fuori
+                    this.referer = data
+                    this.quality = Qualities.Unknown.value
+                    this.isM3u8 = true
+                }
+            )
+            return true
+        }
+        return false
+    }
+
+    data class Preview(@JsonProperty("url") val url: String? = null)
+
+    data class Model(
+        @JsonProperty("username") val username: String? = null,
+        @JsonProperty("previewUrl") val previewUrl: String? = null,
+        @JsonProperty("thumbUrl") val thumbUrl: String? = null,
+        @JsonProperty("preview") val preview: Preview? = null,
+    )
+
+    data class StripResponse(
+        @JsonProperty("models") val models: List<Model>? = null
+    )
+}
